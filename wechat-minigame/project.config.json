@@ -1,0 +1,22 @@
+{
+  "description": "拯救小动物 — 个人主体小游戏占位工程。把 appid 换成微信公众平台的 AppID 后再用开发者工具打开。",
+  "packOptions": {
+    "ignore": []
+  },
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "minified": true
+  },
+  "compileType": "game",
+  "libVersion": "3.8.0",
+  "appid": "wxYOUR_APPID",
+  "projectname": "save-animals-shelter",
+  "condition": {
+    "game": {
+      "current": -1,
+      "list": []
+    }
+  }
+}
