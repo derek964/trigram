@@ -2,7 +2,19 @@ import { track } from "../analytics";
 import { LEGAL, type LegalKind } from "../legal";
 import { playSfx, rumble, unlockAudio, VIBE } from "./audio";
 import { makeChaser, updateChaser, type Chaser } from "./chaser";
-import { CHAPTER_NAMES, LEVELS, PLAYER_RADIUS, SPEED, playVisionRadius, usesVisionDisc, type LevelConfig } from "./levels";
+import {
+  CHAPTER_NAMES,
+  LEVELS,
+  PLAYER_RADIUS,
+  SPEED,
+  playVisionRadius,
+  showsFingerCue,
+  showsJunctionChevron,
+  showsPathPreview,
+  usesHardVisionMask,
+  usesVisionDisc,
+  type LevelConfig,
+} from "./levels";
 import {
   createFeedback,
   currentPhase,
@@ -406,7 +418,7 @@ export class Game {
     if (fromShot && this.shotMode === "feedbackpeek") {
       this.paintFeedbackTrail(true);
     }
-    if (fromShot && this.shotMode === "finger") {
+    if (fromShot && this.shotMode === "finger" && showsFingerCue(this.levelId)) {
       this.beginFingerCue(true);
     }
     this.snapCamera();
@@ -426,7 +438,7 @@ export class Game {
     if (!fromShot) {
       track(retry ? "level_retry" : "level_start", { level: cfg.id, chapter: cfg.chapter });
     }
-    if (!fromShot && this.levelId === 1) this.beginFingerCue(false);
+    if (!fromShot && showsFingerCue(this.levelId)) this.beginFingerCue(false);
     if (fromShot && this.shotMode === "clear") {
       document.body.dataset.view = "clear";
       this.playTime = 22.4;
@@ -1314,6 +1326,7 @@ export class Game {
   }
 
   private beginFingerCue(hold: boolean): void {
+    if (!showsFingerCue(this.levelId)) return;
     const path = feedbackPath(this.maze, this.hasKey);
     const next = path[1];
     if (next == null) return;
@@ -1411,9 +1424,10 @@ export class Game {
       trail: this.feedback?.trail,
       visionMask: usesVisionDisc(this.levelId) && !this.peeking && !this.escorting,
       visionRadius: playVisionRadius(this.levelId),
+      hardVision: usesHardVisionMask(this.levelId),
       trailMood: this.trailMood,
       trailPulse: this.trailPulse,
-      preview: this.preview,
+      preview: showsPathPreview(this.levelId) ? this.preview : null,
       goalMark: this.goalMark(),
       chevron: this.junctionChevron(),
       particles: this.particles.map((p) => ({ x: p.x, y: p.y, r: p.r, a: Math.max(0, p.life) })),
@@ -1433,7 +1447,7 @@ export class Game {
   }
 
   private junctionChevron(): { x: number; y: number; ang: number } | null {
-    if (this.levelId < 2 || this.levelId > 5 || this.peeking) return null;
+    if (!showsJunctionChevron(this.levelId) || this.peeking) return null;
     const from = cellAt(this.maze, this.player);
     const locked = this.maze.locked;
     const goal = this.maze.config.needsKey && !this.hasKey

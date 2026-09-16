@@ -178,7 +178,49 @@ export function playVisionRadius(id: number): number {
   return id <= 2 ? 2.2 : 2.0;
 }
 
+export type VisionFog = "none" | "soft-silhouette" | "hard-black";
+
+/** L1 full-bright; L2 circular disc with wall silhouette under soft fog; L3+ hard black outside the disc. */
+export function visionFog(id: number): VisionFog {
+  if (id <= 1) return "none";
+  if (id === 2) return "soft-silhouette";
+  return "hard-black";
+}
+
 /** Circular vision starts at L2. L1 is full-bright so the first idea is one-step tap + rescue. */
 export function usesVisionDisc(id: number): boolean {
-  return id >= 2;
+  return visionFog(id) !== "none";
+}
+
+/** L2 only: pale wall traces stay readable outside the disc. L3+ must not silhouette. */
+export function usesWallSilhouette(id: number): boolean {
+  return visionFog(id) === "soft-silhouette";
+}
+
+/** L3+: opaque circular FOV. Outside the lit disc is fully black / unseen. */
+export function usesHardVisionMask(id: number): boolean {
+  return visionFog(id) === "hard-black";
+}
+
+/**
+ * What 「箭头」 means in this build, and who gets them:
+ * - L1 finger cue (DOM hand + one-step preview) — teaching tap
+ * - L2 junction chevron (mint triangle on the next hop) + one-step tap preview
+ * - Path-preview dashed ribbon (adjacent step only; never a multi-hop A* ghost)
+ * L3+ has none of these. Keyboard Arrow keys are unrelated input mapping.
+ */
+export function showsFingerCue(id: number): boolean {
+  return id === 1;
+}
+
+export function showsJunctionChevron(id: number): boolean {
+  return id === 2;
+}
+
+export function showsPathPreview(id: number): boolean {
+  return id <= 2;
+}
+
+export function showsTeachingArrows(id: number): boolean {
+  return showsFingerCue(id) || showsJunctionChevron(id) || showsPathPreview(id);
 }
