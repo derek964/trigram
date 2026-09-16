@@ -340,29 +340,33 @@ function drawWalls(ctx: CanvasRenderingContext2D, maze: Maze): void {
 }
 
 function drawRepairHighlight(ctx: CanvasRenderingContext2D, maze: Maze, time: number): void {
-  const pulse = 0.45 + Math.sin(time * 6) * 0.2;
+  const pulse = 0.72 + Math.sin(time * 6) * 0.18;
   ctx.save();
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  ctx.strokeStyle = `rgba(255, 123, 107, ${pulse})`;
-  ctx.lineWidth = WALL_DRAW_WIDTH + 0.11;
-  ctx.beginPath();
-  for (const s of maze.strokes) {
-    if (isApproachStroke(maze, s)) continue;
-    if (s.kind === "arc") {
-      const a0 = angNorm(s.th0);
-      const span = Math.max(0.01, angLerp(s.th0, s.th1));
-      ctx.moveTo(s.r * Math.cos(a0), s.r * Math.sin(a0));
-      ctx.arc(0, 0, s.r, a0, a0 + span);
-    } else if (s.kind === "radial") {
-      ctx.moveTo(s.ri * Math.cos(s.th), s.ri * Math.sin(s.th));
-      ctx.lineTo(s.ro * Math.cos(s.th), s.ro * Math.sin(s.th));
-    } else {
-      ctx.moveTo(s.a.x, s.a.y);
-      ctx.lineTo(s.b.x, s.b.y);
+  const paint = (color: string, width: number) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    for (const s of maze.strokes) {
+      if (isApproachStroke(maze, s)) continue;
+      if (s.kind === "arc") {
+        const a0 = angNorm(s.th0);
+        const span = Math.max(0.01, angLerp(s.th0, s.th1));
+        ctx.moveTo(s.r * Math.cos(a0), s.r * Math.sin(a0));
+        ctx.arc(0, 0, s.r, a0, a0 + span);
+      } else if (s.kind === "radial") {
+        ctx.moveTo(s.ri * Math.cos(s.th), s.ri * Math.sin(s.th));
+        ctx.lineTo(s.ro * Math.cos(s.th), s.ro * Math.sin(s.th));
+      } else {
+        ctx.moveTo(s.a.x, s.a.y);
+        ctx.lineTo(s.b.x, s.b.y);
+      }
     }
-  }
-  ctx.stroke();
+    ctx.stroke();
+  };
+  paint(`rgba(255, 123, 107, ${pulse * 0.45})`, WALL_DRAW_WIDTH + 0.22);
+  paint(`rgba(255, 210, 170, ${pulse})`, WALL_DRAW_WIDTH + 0.04);
   ctx.restore();
 }
 

@@ -597,9 +597,12 @@ export class Game {
     const teach = this.levelId === 1 && this.shotMode !== "hud";
     qs("#hud").classList.toggle("hidden", !on);
     qs("#dock").classList.toggle("hidden", !on || teach);
+    qs("#stick-hint").classList.toggle("hidden", !on);
     if (!on) {
       this.repairMode = false;
       qs("#repair-hint").classList.add("hidden");
+      qs("#toast").classList.add("hidden");
+      qs("#micro-cue").classList.add("hidden");
       document.querySelector("#btn-repair")?.classList.remove("armed");
     }
   }
