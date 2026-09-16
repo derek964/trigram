@@ -637,11 +637,26 @@ function isApproach(maze: Maze, s: Extract<Stroke, { kind: "seg" }>): boolean {
   );
 }
 
-export function punchHole(maze: Maze, world: Vec2, width = HOLE_WIDTH): boolean {
+export function isApproachStroke(maze: Maze, s: Stroke): boolean {
+  return s.kind === "seg" && isApproach(maze, s);
+}
+
+/** Distance to the nearest wall that 检修 can actually open. */
+export function nearestPunchableDist(maze: Maze, world: Vec2): number {
+  let best = Infinity;
+  for (const s of maze.strokes) {
+    if (isApproachStroke(maze, s)) continue;
+    best = Math.min(best, distToStroke(world, s));
+  }
+  return best;
+}
+
+export function punchHole(maze: Maze, world: Vec2, width = HOLE_WIDTH, maxDist = 0.85): boolean {
   let best = -1;
-  let bestD = 0.85;
+  let bestD = maxDist;
   for (let i = 0; i < maze.strokes.length; i++) {
     const s = maze.strokes[i]!;
+    if (isApproachStroke(maze, s)) continue;
     const d = distToStroke(world, s);
     if (d < bestD) {
       bestD = d;
@@ -650,7 +665,6 @@ export function punchHole(maze: Maze, world: Vec2, width = HOLE_WIDTH): boolean 
   }
   if (best < 0) return false;
   const s = maze.strokes[best]!;
-  if (s.kind === "seg" && isApproach(maze, s)) return false;
   const next: Stroke[] = [];
   if (s.kind === "arc") {
     const th = angNorm(Math.atan2(world.y, world.x));

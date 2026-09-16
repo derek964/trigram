@@ -18,43 +18,22 @@
   <body>
     <div id="app">
       <header class="hud hidden" id="hud">
-        <div class="hud-row">
-          <div class="hud-left">
-            <div class="brand">拯救小动物</div>
-            <div class="level-chip" id="level-label">第1关</div>
-            <div class="steps">步 <span id="step-count">0</span></div>
-            <div class="steps" id="time-count">0:00.0</div>
-            <div
-              class="charges"
-              id="charge-stat"
-              title="检修口剩余次数"
-              aria-label="检修口剩余 3 次"
-            >
-              <svg class="charge-icon" viewBox="0 0 16 16" aria-hidden="true">
-                <rect x="2.2" y="3" width="11.6" height="10" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.5" />
-                <path d="M4.4 6.1h7.2M4.4 8.2h7.2M4.4 10.3h7.2" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" />
-              </svg>
-              检修 <span id="heart-count">▣▣▣</span>
-            </div>
-          </div>
-          <div class="hud-center">
-            <div class="key-stat hidden" id="key-stat">值班钥匙 <span id="key-count">寻找中</span></div>
-          </div>
-          <div class="hud-right">
-            <button type="button" class="ghost on" id="btn-sfx" aria-label="音效">音效开</button>
-            <button type="button" class="ghost" id="btn-vib" aria-label="震动">震动开</button>
-            <button type="button" class="ghost" id="btn-peek" aria-label="监控">监控 <span id="peek-count">3</span></button>
-            <button type="button" class="ghost" id="btn-undo" aria-label="撤销上一步">撤销</button>
-            <button type="button" class="ghost" id="btn-restart">重开</button>
-          </div>
-        </div>
-        <div class="prox-wrap" id="prox-wrap" role="meter" aria-label="接近" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-          <div class="prox-meta">
-            <span id="prox-label">接近</span>
-            <span class="prox-phase" id="prox-phase">隔离间</span>
+        <div class="hud-top">
+          <div class="level-chip" id="level-label">第1关</div>
+          <div
+            class="objective-chip"
+            id="prox-wrap"
+            role="meter"
+            aria-label="接近"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="0"
+          >
+            <span id="prox-phase">隔离间</span>
             <span class="prox-pct" id="prox-pct">0%</span>
           </div>
-          <div class="prox-bar"><div id="prox-fill"></div></div>
+          <div class="time-chip hidden" id="time-count">剩余 00:00</div>
+          <button type="button" class="ghost icon" id="btn-pause" aria-label="暂停">暂停</button>
         </div>
       </header>
 
@@ -77,16 +56,26 @@
         <div id="stick-base" class="hidden">
           <div id="stick-nub"></div>
         </div>
+        <div class="banner hidden" id="peek-badge">监控中 · 轻触关闭</div>
+        <div class="banner hidden" id="repair-hint">点发光的墙开检修口 · 再点检修取消</div>
+        <div class="banner tip hidden" id="tip-banner">
+          <span id="tip-text">好像绕晕了？点底部「检修」，再点发光的墙开检修口。</span>
+          <button type="button" class="tiny" id="btn-tip-ok">知道了</button>
+        </div>
+        <div class="toast hidden" id="toast"></div>
+        <div class="micro-cue hidden" id="micro-cue">靠近了</div>
+        <div class="banner dead hidden" id="dead-banner">此路不通</div>
       </main>
 
-      <div class="banner hidden" id="peek-badge">监控中 · 轻触关闭</div>
-      <div class="banner tip hidden" id="tip-banner">
-        <span id="tip-text">好像绕晕了？点墙壁开「检修口」——花一次检修从墙根钻过去。</span>
-        <button type="button" class="tiny" id="btn-tip-ok">知道了</button>
-      </div>
-      <div class="toast hidden" id="toast"></div>
-      <div class="micro-cue hidden" id="micro-cue">靠近了</div>
-      <div class="banner dead hidden" id="dead-banner">此路不通</div>
+      <footer class="dock hidden" id="dock">
+        <button type="button" class="ghost dock-btn" id="btn-repair" aria-label="检修">
+          检修 <span id="heart-count">▣▣▣</span>
+        </button>
+        <button type="button" class="ghost dock-btn" id="btn-peek" aria-label="监控">
+          监控 <span id="peek-count">3</span>
+        </button>
+        <button type="button" class="ghost dock-btn" id="btn-undo" aria-label="撤销上一步">撤销</button>
+      </footer>
 
       <section class="overlay" id="title-screen">
         <div class="panel">
@@ -94,7 +83,7 @@
           <p class="kicker">夜班志愿者</p>
           <h1>拯救小动物</h1>
           <p class="lead">
-            在收容所平面图上走夜班：从南门进楼，把隔离间里的小动物带到出口。绕晕了就点墙开检修口。
+            在收容所平面图上走夜班：从南门进楼，把隔离间里的小动物带到出口。绕晕了就点「检修」再点墙。
           </p>
           <button type="button" class="primary" id="btn-start">开始救援</button>
           <button type="button" class="ghost hidden" id="btn-continue">继续救援</button>
@@ -128,6 +117,23 @@
           <div class="row">
             <button type="button" class="ghost" id="btn-next">下一关</button>
             <button type="button" class="primary" id="btn-win-home">关卡</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="overlay hidden" id="pause-screen">
+        <div class="panel">
+          <p class="kicker">暂停</p>
+          <h2>夜班暂停</h2>
+          <p class="lead">音效、震动和重开都放在这里，不挡平面图。</p>
+          <div class="row">
+            <button type="button" class="ghost on" id="btn-sfx" aria-label="音效">音效开</button>
+            <button type="button" class="ghost" id="btn-vib" aria-label="震动">震动开</button>
+          </div>
+          <button type="button" class="primary" id="btn-resume">继续救援</button>
+          <div class="row">
+            <button type="button" class="ghost" id="btn-restart">重开</button>
+            <button type="button" class="ghost" id="btn-pause-home">关卡</button>
           </div>
         </div>
       </section>
