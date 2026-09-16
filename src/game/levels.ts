@@ -178,7 +178,7 @@ export function playVisionRadius(id: number): number {
   return id <= 2 ? 2.2 : 2.0;
 }
 
-/** Circular vision starts at L2. L1 is full-bright so the first idea is tap + rescue. */
+/** Circular vision starts at L2. L1 is full-bright so the first idea is one-step tap + rescue. */
 export function usesVisionDisc(id: number): boolean {
   return id >= 2;
 }

@@ -23,7 +23,7 @@ Demo: [https://onyx-cipher-3bdv.here.now/?v=shelter-prelaunch-1](https://onyx-ci
 
 ## Play
 
-**L1 is full-bright** (no vision disc): tap a floor cell, follow the path, hug the animal out. **L2 turns on the circular disc**; walls stay silhouetted outside it. Drag / WASD still works. Mint HUD, coral trail, thin walls.
+**L1 is full-bright** (no vision disc): tap an **adjacent** floor cell to walk one step, or drag / WASD; hug the animal out. Distant taps do not auto-pathfind. **L2 turns on the circular disc**; walls stay silhouetted outside it. Mint HUD, coral trail, thin walls.
 
 WeChat launch notes for a **personal** 小游戏 account (开通前 vs 有 AppID 之后、流量主限制、软著): [`docs/wechat-launch-checklist.md`](docs/wechat-launch-checklist.md). Scaffold for 微信开发者工具: `wechat-minigame/` (`appid` placeholder `wxYOUR_APPID`). Ad unit placeholders: `src/game/ad-config.ts`.
 

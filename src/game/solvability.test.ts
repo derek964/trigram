@@ -134,13 +134,13 @@ test("检修口 punch cuts real orthogonal geometry", () => {
   assert.ok(before > 0);
 });
 
-test("tap route from the south gate reaches a linked neighbor", () => {
+test("south gate has a one-hop walkable neighbor", () => {
   const maze = generateMaze(LEVELS[0]!);
   const start = maze.startCell;
   const n = [...maze.cells[start]!.links][0];
   assert.ok(n !== undefined);
   const path = cellPathFrom(maze, start, (id) => id === n, false);
-  assert.ok(path && path.length >= 2, "tap preview should find a walkable neighbor");
+  assert.ok(path && path.length === 2, "start should link to an adjacent cell");
 });
 
 test("level patterns A–F are encoded in the generated graphs", () => {

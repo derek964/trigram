@@ -104,7 +104,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, w: number, h: number, v
     drawVisionMask(ctx, player, cam, w, h, radius);
     drawWallSilhouette(ctx, maze, player, cam, w, h, radius);
   }
-  // Route preview sits above fog so a tap-to-move path stays readable.
+  // One-step tap preview sits above fog; never a multi-cell auto-route.
   if (view.preview) drawPreview(ctx, view.preview.pts, view.preview.ok);
   if (view.goalMark) drawGoalMark(ctx, view.goalMark, time);
   if (view.chevron) drawChevron(ctx, view.chevron);
