@@ -1,6 +1,19 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CHAPTER_NAMES, LEVELS, LEVEL_COUNT, MIN_CORRIDOR, minCellHops, minGeoSteps, usesVisionDisc } from "./levels";
+import {
+  CHAPTER_NAMES,
+  LEVELS,
+  LEVEL_COUNT,
+  MIN_CORRIDOR,
+  minCellHops,
+  minGeoSteps,
+  showsFingerCue,
+  showsJunctionChevron,
+  showsPathPreview,
+  usesHardVisionMask,
+  usesVisionDisc,
+  usesWallSilhouette,
+} from "./levels";
 import {
   cellPathFrom,
   cellPathToCenter,
@@ -43,6 +56,11 @@ test("campaign ships 30 square levels with shelter chapter names", () => {
     else if (cfg.id <= 20) assert.equal(cfg.pattern, "E");
     else assert.equal(cfg.pattern, "F");
     assert.equal(usesVisionDisc(cfg.id), cfg.id >= 2, `L${cfg.id} vision drip`);
+    assert.equal(usesWallSilhouette(cfg.id), cfg.id === 2, `L${cfg.id} silhouette only on L2`);
+    assert.equal(usesHardVisionMask(cfg.id), cfg.id >= 3, `L${cfg.id} hard FOV from L3`);
+    assert.equal(showsJunctionChevron(cfg.id), cfg.id === 2, `L${cfg.id} junction chevron`);
+    assert.equal(showsPathPreview(cfg.id), cfg.id <= 2, `L${cfg.id} path-preview ribbon`);
+    assert.equal(showsFingerCue(cfg.id), cfg.id === 1, `L${cfg.id} finger cue`);
     if (cfg.id <= 5) assert.equal(cfg.timeLimit, 0, `L${cfg.id} tutorial band must not hard-fail on time`);
     else assert.ok(cfg.timeLimit >= 90, `L${cfg.id} later levels keep a generous countdown`);
   }

@@ -23,7 +23,11 @@ Demo: [https://onyx-cipher-3bdv.here.now/?v=shelter-prelaunch-1](https://onyx-ci
 
 ## Play
 
-**L1 is full-bright** (no vision disc): tap an **adjacent** floor cell to walk one step, or drag / WASD; hug the animal out. Distant taps do not auto-pathfind. **L2 turns on the circular disc**; walls stay silhouetted outside it. Mint HUD, coral trail, thin walls.
+**L1 is full-bright** (no vision disc): tap an **adjacent** floor cell to walk one step, or drag / WASD; hug the animal out. Distant taps do not auto-pathfind. Teaching finger + one-step path preview stay on L1.
+
+**L2 turns on the circular disc** with **soft fog** and **wall silhouettes** outside it, plus the junction chevron (mint direction triangle) and one-step tap preview.
+
+**L3+ is circular vision only:** the lit disc around the volunteer is visible; everything outside is **fully black** (no wall silhouette, no faint maze outline). Teaching arrows are gone — no junction chevron, no finger cue, no path-preview ribbon. Adjacent-only taps, 检修 wall-select, timer/fail, and 偷宠贼 are unchanged. Mint HUD, coral trail, thin walls.
 
 WeChat launch notes for a **personal** 小游戏 account (开通前 vs 有 AppID 之后、流量主限制、软著): [`docs/wechat-launch-checklist.md`](docs/wechat-launch-checklist.md). Scaffold for 微信开发者工具: `wechat-minigame/` (`appid` placeholder `wxYOUR_APPID`). Ad unit placeholders: `src/game/ad-config.ts`.
 
@@ -31,10 +35,10 @@ Analytics debug: open `?debug=1` **or long-press the title logo / HUD brand ~0.6
 
 Title-screen **隐私政策 / 用户协议 / 适龄 8+** are in-game sheets (personal-developer placeholders). Swap in your real name and email before store review.
 
-- **夜巡 L1–10** — L1 teaches move + rescue; L2 adds fog; L3+ adds bait. Hard curve returns from L6+
+- **夜巡 L1–10** — L1 teaches move + rescue; L2 adds soft fog + silhouette; L3+ is hard circular FOV (black outside the disc) and adds bait. Hard curve returns from L6+
 - **钥匙串 L11–20** — pick up the **值班钥匙**, then open the cage
 - **防盗夜 L21–30** — same maze plus a **偷宠贼** with line-of-sight chase
-- **监控** — L2+ limited full-map peek; later uses are a rewarded-ad placeholder. Seeing the goal is never gated behind an ad (L1 is fully lit; later levels keep wall silhouettes).
+- **监控** — L2+ limited full-map peek; later uses are a rewarded-ad placeholder. Seeing the goal is never gated behind an ad (L1 is fully lit; L2 keeps wall silhouettes under fog; L3+ hides the maze outside the disc until you peek).
 - **检修口** — from L2, tap **检修** to enter wall-select, then tap a highlighted wall. Floor taps only walk. Cancel by tapping 检修 again; a charge is spent only after the hole opens.
 - **撤销** — free one-step undo (L2+), on the bottom bar
 - **看视频** — IAA stub restores 监控 / 检修 / revive. No interstitial on L1–5 (or L1–9); chapter-end only at L10 / L20 / L30
@@ -46,7 +50,7 @@ On a clear, a hug/scale bump + particles, then the animal walks itself to the so
 - **足迹** — a continuous ribbon through walked cell centers. No decorative zone nameplates (猫房 / 医务 / 犬舍).
 - **时间** — L1–5 never fail on the clock (stars can still use par time). L6+ show `剩余 MM:SS`, warn in the last 10 seconds, and fail with「时间到了，还差×格。」The clock pauses during tips, the pause menu, and ads. Thief catches still say so.
 
-Query params for captures: `?shot=peek&level=N`, `?shot=walk&level=1` (L1 no fog), `?shot=walk&level=2` (disc), `?shot=path&level=1`, `?shot=hud&level=2`, `?shot=finger&level=1`, `?shot=key&level=11`, `?shot=chaser&level=21`, `?shot=tip&level=1`, `?shot=clear&level=1`.
+Query params for captures: `?shot=peek&level=N`, `?shot=walk&level=1` (L1 no fog), `?shot=walk&level=2` (soft disc + silhouette), `?shot=walk&level=3` (hard black FOV), `?shot=path&level=1`, `?shot=hud&level=2`, `?shot=finger&level=1`, `?shot=key&level=11`, `?shot=chaser&level=21`, `?shot=tip&level=1`, `?shot=clear&level=1`.
 
 Stills: `/previews/l01_nofog_rescue.png`, `/previews/l02_vision_disc.png`, `/previews/l02_hud_jiejin_jianxiu.png`, `/previews/l01_path_preview_line.png`, `/previews/l01_floor_no_zones.png`, `/previews/debug_analytics_panel.png` (`?debug=1` 埋点面板).
 

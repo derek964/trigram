@@ -29,6 +29,8 @@ export interface RenderView {
   trail?: number[];
   visionMask?: boolean;
   visionRadius?: number;
+  /** L3+: fully opaque black outside the disc. L2 uses the soft fog + silhouette instead. */
+  hardVision?: boolean;
   trailMood?: number;
   trailPulse?: number;
   preview?: { pts: Vec2[]; ok: boolean } | null;
@@ -93,6 +95,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, w: number, h: number, v
   if (view.chaser) drawThief(ctx, view.chaser, time);
   if (view.particles) drawParticles(ctx, view.particles);
 
+  const radius = view.visionRadius ?? PLAY_VISION_RADIUS;
   if (peeking) {
     ctx.strokeStyle = "rgba(255, 123, 107, 0.9)";
     ctx.lineWidth = 0.08;
@@ -100,14 +103,30 @@ export function drawWorld(ctx: CanvasRenderingContext2D, w: number, h: number, v
     ctx.arc(player.x, player.y, 0.52 + Math.sin(time * 4) * 0.06, 0, Math.PI * 2);
     ctx.stroke();
   } else if (view.visionMask) {
-    const radius = view.visionRadius ?? PLAY_VISION_RADIUS;
-    drawVisionMask(ctx, player, cam, w, h, radius);
-    drawWallSilhouette(ctx, maze, player, cam, w, h, radius);
+    if (view.hardVision) {
+      drawHardVisionMask(ctx, player, cam, w, h, radius);
+    } else {
+      drawVisionMask(ctx, player, cam, w, h, radius);
+      drawWallSilhouette(ctx, maze, player, cam, w, h, radius);
+    }
   }
-  // One-step tap preview sits above fog; never a multi-cell auto-route.
-  if (view.preview) drawPreview(ctx, view.preview.pts, view.preview.ok);
-  if (view.goalMark) drawGoalMark(ctx, view.goalMark, time);
-  if (view.chevron) drawChevron(ctx, view.chevron);
+  const drawMarks = (): void => {
+    // One-step tap preview sits above fog; never a multi-cell auto-route.
+    if (view.preview) drawPreview(ctx, view.preview.pts, view.preview.ok);
+    if (view.goalMark) drawGoalMark(ctx, view.goalMark, time);
+    if (view.chevron) drawChevron(ctx, view.chevron);
+  };
+  if (view.visionMask && view.hardVision && !peeking) {
+    // Clip marks to the disc so nothing (goal pip, leftover preview) reads through black.
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, radius, 0, Math.PI * 2);
+    ctx.clip();
+    drawMarks();
+    ctx.restore();
+  } else {
+    drawMarks();
+  }
   if (view.clearPulse && view.clearPulse > 0) {
     ctx.fillStyle = `rgba(255, 253, 249, ${0.22 * view.clearPulse})`;
     const hw = w / (2 * cam.scale) + 2;
@@ -115,6 +134,10 @@ export function drawWorld(ctx: CanvasRenderingContext2D, w: number, h: number, v
     ctx.fillRect(cam.x - hw, cam.y - hh, hw * 2, hh * 2);
   }
   ctx.restore();
+}
+
+function viewHalfExtents(cam: Camera, viewW: number, viewH: number): { hw: number; hh: number } {
+  return { hw: viewW / (2 * cam.scale) + 1.2, hh: viewH / (2 * cam.scale) + 1.2 };
 }
 
 function drawVisionMask(
@@ -125,14 +148,40 @@ function drawVisionMask(
   viewH: number,
   radius: number,
 ): void {
-  const hw = viewW / (2 * cam.scale) + 1.2;
-  const hh = viewH / (2 * cam.scale) + 1.2;
+  const { hw, hh } = viewHalfExtents(cam, viewW, viewH);
   const inner = Math.max(0.08, radius - VISION_FEATHER);
   const g = ctx.createRadialGradient(player.x, player.y, inner, player.x, player.y, radius);
   g.addColorStop(0, "rgba(28, 52, 46, 0)");
   g.addColorStop(1, "rgba(18, 42, 36, 0.78)");
   ctx.fillStyle = g;
   ctx.fillRect(cam.x - hw, cam.y - hh, hw * 2, hh * 2);
+}
+
+/** Hard circular FOV: everything outside the disc is opaque black. No wall traces. */
+function drawHardVisionMask(
+  ctx: CanvasRenderingContext2D,
+  player: Player,
+  cam: Camera,
+  viewW: number,
+  viewH: number,
+  radius: number,
+): void {
+  const { hw, hh } = viewHalfExtents(cam, viewW, viewH);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(cam.x - hw, cam.y - hh, hw * 2, hh * 2);
+  ctx.arc(player.x, player.y, radius, 0, Math.PI * 2, true);
+  ctx.fillStyle = "#000000";
+  ctx.fill("evenodd");
+  ctx.restore();
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(255, 250, 240, 0.35)";
+  ctx.lineWidth = 0.04;
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawYard(ctx: CanvasRenderingContext2D, maze: Maze): void {

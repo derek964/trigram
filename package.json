@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0 --port 4521",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4521",
-    "test": "tsx --test src/game/solvability.test.ts src/game/ads.test.ts src/game/sim.test.ts src/game/feedback.test.ts src/game/audio.test.ts src/analytics.test.ts src/game/ad-service.test.ts src/game/play-intent.test.ts src/game/play-clock.test.ts",
+    "test": "tsx --test src/game/solvability.test.ts src/game/ads.test.ts src/game/sim.test.ts src/game/feedback.test.ts src/game/audio.test.ts src/analytics.test.ts src/game/ad-service.test.ts src/game/play-intent.test.ts src/game/play-clock.test.ts src/game/vision.test.ts",
     "sim:levels": "tsx src/game/sim-levels.ts"
   },
   "devDependencies": {
