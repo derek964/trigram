@@ -19,6 +19,7 @@ import {
   generateMaze,
   inPlayableFloor,
   shortestPath,
+  walkableNeighbors,
   type Maze,
 } from "./maze";
 import { clamp, dist, lerp, type Vec2 } from "./math";
@@ -37,7 +38,7 @@ import {
   stepPlayClock,
   type FailKind,
 } from "./play-clock";
-import { applyRepairTap, resolvePlayTap } from "./play-intent";
+import { applyRepairTap, resolvePlayTap, resolveTapMove } from "./play-intent";
 import { drawWorld, fitPeekScale, type Camera, type Player } from "./render";
 import { UI_BUTTON_IDS, type UiButtonId } from "./ui-buttons";
 
@@ -107,8 +108,8 @@ export class Game {
   private proxPulse = 0;
   private trailMood = 0;
   private trailPulse = 0;
-  private autoRoute: { x: number; y: number }[] | null = null;
-  private autoI = 0;
+  /** One adjacent cell the volunteer is walking into — never a multi-hop A* route. */
+  private stepTarget: { x: number; y: number } | null = null;
   private preview: { pts: { x: number; y: number }[]; ok: boolean } | null = null;
   private previewT = 0;
   private undoSnap: UndoSnap | null = null;
@@ -361,8 +362,7 @@ export class Game {
     this.proxPulse = 0;
     this.trailMood = 0;
     this.trailPulse = 0;
-    this.autoRoute = null;
-    this.autoI = 0;
+    this.stepTarget = null;
     this.preview = null;
     this.previewT = 0;
     this.undoSnap = null;
@@ -471,10 +471,16 @@ export class Game {
   }
 
   private showShotPathPreview(): void {
-    const path = feedbackPath(this.maze, this.hasKey);
-    const ids = path.slice(0, Math.min(7, path.length));
+    const from = cellAt(this.maze, this.player);
+    const n = walkableNeighbors(this.maze, from, this.maze.locked)[0];
+    if (n == null) return;
+    const a = this.maze.cells[from]!;
+    const b = this.maze.cells[n]!;
     this.preview = {
-      pts: ids.map((id) => ({ x: this.maze.cells[id]!.x, y: this.maze.cells[id]!.y })),
+      pts: [
+        { x: a.x, y: a.y },
+        { x: b.x, y: b.y },
+      ],
       ok: true,
     };
     this.previewT = 99;
@@ -588,7 +594,7 @@ export class Game {
     btn?.classList.toggle("armed", on);
     qs("#repair-hint").classList.toggle("hidden", !on);
     if (on) {
-      this.autoRoute = null;
+      this.stepTarget = null;
       this.toast("点发光的墙开检修口");
     }
   }
@@ -638,27 +644,36 @@ export class Game {
     }
     if (action === "noop") return;
     if (this.onApproachPath(world)) {
-      this.toast("走进平面图，点格子走路。开检修口请先点「检修」");
+      this.toast("走进平面图，点相邻格子走一步。开检修口请先点「检修」");
       return;
     }
     this.tryTapMove(world);
   }
 
   private tryTapMove(world: { x: number; y: number }): void {
-    const id = cellAt(this.maze, world);
-    const c = this.maze.cells[id];
-    if (!c || dist(world, c) > this.maze.cellSize * 0.58) {
+    const intent = resolveTapMove(this.maze, this.player, world);
+    if (intent.kind === "miss") {
       this.preview = { pts: [this.player, world], ok: false };
       this.previewT = 0.45;
       playSfx("ui", this.progress.sfx);
       rumble(this.progress.vib, VIBE.ui);
       return;
     }
-    const from = cellAt(this.maze, this.player);
-    const locked = this.maze.locked;
-    const path = cellPathFrom(this.maze, from, (n) => n === id, locked);
-    const pts = (path ?? [from, id]).map((cid) => ({ x: this.maze.cells[cid]!.x, y: this.maze.cells[cid]!.y }));
-    if (!path) {
+    const fromC = this.maze.cells[intent.from]!;
+    const toC = this.maze.cells[intent.to]!;
+    const pts = [
+      { x: fromC.x, y: fromC.y },
+      { x: toC.x, y: toC.y },
+    ];
+    if (intent.kind === "far") {
+      this.preview = null;
+      this.previewT = 0;
+      playSfx("ui", this.progress.sfx);
+      rumble(this.progress.vib, VIBE.ui);
+      this.microCue("点相邻格子");
+      return;
+    }
+    if (intent.kind === "blocked") {
       this.preview = { pts, ok: false };
       this.previewT = 0.7;
       playSfx("dead", this.progress.sfx);
@@ -668,10 +683,9 @@ export class Game {
     }
     this.captureUndo();
     this.preview = { pts, ok: true };
-    this.previewT = 1.6;
-    this.autoRoute = pts.slice(1);
-    this.autoI = 0;
-    if (!this.shotMode) track("path_tap", { level: this.levelId, hops: pts.length });
+    this.previewT = 1.1;
+    this.stepTarget = { x: toC.x, y: toC.y };
+    if (!this.shotMode) track("path_tap", { level: this.levelId, hops: 1 });
   }
 
   private captureUndo(): void {
@@ -702,7 +716,7 @@ export class Game {
     this.feedback.lastValue = s.lastValue;
     this.lastCell = s.lastCell;
     this.steps = s.steps;
-    this.autoRoute = null;
+    this.stepTarget = null;
     this.preview = null;
     this.undoSnap = null;
     this.syncHud();
@@ -886,7 +900,7 @@ export class Game {
     if (this.trailPulse > 0) this.trailPulse = Math.max(0, this.trailPulse - dt * 3.2);
     if (this.previewT > 0) {
       this.previewT -= dt;
-      if (this.previewT <= 0 && !this.autoRoute) this.preview = null;
+      if (this.previewT <= 0 && !this.stepTarget) this.preview = null;
     }
     if (this.cueT > 0) {
       this.cueT -= dt;
@@ -924,16 +938,15 @@ export class Game {
         vy = s.y;
       }
       if (Math.hypot(vx, vy) > 0.08) {
-        this.autoRoute = null;
-      } else if (this.autoRoute && this.autoI < this.autoRoute.length) {
-        const t = this.autoRoute[this.autoI]!;
+        this.stepTarget = null;
+      } else if (this.stepTarget) {
+        const t = this.stepTarget;
         const d = dist(this.player, t);
-        if (d < 0.1) this.autoI += 1;
+        if (d < 0.1) this.stepTarget = null;
         else {
           vx = (t.x - this.player.x) / d;
           vy = (t.y - this.player.y) / d;
         }
-        if (this.autoI >= this.autoRoute.length) this.autoRoute = null;
       }
     }
 
@@ -991,7 +1004,7 @@ export class Game {
     const cell = cellAt(this.maze, this.player);
     const goalD = dist(this.player, { x: 0, y: 0 });
     if (cell !== this.lastCell) {
-      if (!this.autoRoute) this.captureUndo();
+      if (!this.stepTarget) this.captureUndo();
       const ev = markCell(this.feedback, cell);
       this.applyVisit(ev);
       this.recentCells.push(cell);
@@ -1169,7 +1182,7 @@ export class Game {
     }
     this.replayT = 0;
     this.screen = "replay";
-    this.autoRoute = null;
+    this.stepTarget = null;
     if (!this.shotMode) track("level_fail", { level: this.levelId, kind });
     playSfx(kind === "thief" ? "catch" : "dead", this.progress.sfx);
     rumble(this.progress.vib, kind === "thief" ? VIBE.medium : VIBE.dead);
@@ -1223,7 +1236,9 @@ export class Game {
     qs("#btn-repair").setAttribute("aria-label", `检修口剩余 ${this.hearts} 次`);
     qs("#btn-peek").setAttribute("aria-label", `监控剩余 ${this.peeksLeft} 次`);
     const teach = this.levelId === 1 && this.shotMode !== "hud";
-    qs("#stick-hint").textContent = teach ? "点格子走到隔离间" : "点格子走路 · 拖动手势或 WASD";
+    qs("#stick-hint").textContent = teach
+      ? "点相邻格子，一步走到隔离间"
+      : "点相邻格子走一步 · 拖动手势或 WASD";
     this.syncTimeHud();
     this.syncProxHud();
   }
@@ -1300,16 +1315,17 @@ export class Game {
 
   private beginFingerCue(hold: boolean): void {
     const path = feedbackPath(this.maze, this.hasKey);
-    const id = path[Math.min(2, Math.max(1, path.length - 1))];
-    if (id == null) return;
-    const c = this.maze.cells[id]!;
+    const next = path[1];
+    if (next == null) return;
+    const here = this.maze.cells[path[0] ?? cellAt(this.maze, this.player)]!;
+    const c = this.maze.cells[next]!;
     this.fingerTarget = { x: c.x, y: c.y };
     this.fingerT = hold ? 99 : 2.8;
     this.preview = {
-      pts: path.slice(0, Math.min(4, path.length)).map((cid) => ({
-        x: this.maze.cells[cid]!.x,
-        y: this.maze.cells[cid]!.y,
-      })),
+      pts: [
+        { x: here.x, y: here.y },
+        { x: c.x, y: c.y },
+      ],
       ok: true,
     };
     this.previewT = hold ? 99 : 2.8;
