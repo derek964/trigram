@@ -35,16 +35,16 @@ Title-screen **隐私政策 / 用户协议 / 适龄 8+** are in-game sheets (per
 - **钥匙串 L11–20** — pick up the **值班钥匙**, then open the cage
 - **防盗夜 L21–30** — same maze plus a **偷宠贼** with line-of-sight chase
 - **监控** — L2+ limited full-map peek; later uses are a rewarded-ad placeholder. Seeing the goal is never gated behind an ad (L1 is fully lit; later levels keep wall silhouettes).
-- **检修口** — from L2, tap a **wall**, spend 1 **检修**, cut a real hole
-- **撤销** — free one-step undo (L2+)
+- **检修口** — from L2, tap **检修** to enter wall-select, then tap a highlighted wall. Floor taps only walk. Cancel by tapping 检修 again; a charge is spent only after the hole opens.
+- **撤销** — free one-step undo (L2+), on the bottom bar
 - **看视频** — IAA stub restores 监控 / 检修 / revive. No interstitial on L1–5 (or L1–9); chapter-end only at L10 / L20 / L30
-- **音效 / 震动** — persistent toggles in `localStorage` (both **on** by default). HUD clicks play a short UI tick + light vibe; steps only tick on **cell enter**. 音效关 mutes WebAudio beeps; 震动关 disables `navigator.vibrate`.
+- **音效 / 震动 / 重开** — in the **暂停** menu (not always-visible top buttons). Toggles persist in `localStorage` (both **on** by default). HUD clicks play a short UI tick + light vibe; steps only tick on **cell enter**. 音效关 mutes WebAudio beeps; 震动关 disables `navigator.vibrate`.
 
 On a clear, a hug/scale bump + particles, then the animal walks itself to the south gate.
 
-- **接近** — dual-phase graph-distance meter (值班钥匙, then 隔离间). Rises with hops toward the current goal; not an emotion/sanity bar, not a route arrow.
+- **接近** — compact top-bar objective (值班钥匙, then 隔离间) plus remaining-time countdown when a level has a hard limit. Camera follows the volunteer in the playfield under that chrome, not under a stacked HUD.
 - **足迹** — a continuous ribbon through walked cell centers. No decorative zone nameplates (猫房 / 医务 / 犬舍).
-- **差一点** — L1–5 soft timeout if you wander; a 0.8s ghost of your trail, then a big **再试**. No countdown on L1–2.
+- **时间** — L1–5 never fail on the clock (stars can still use par time). L6+ show `剩余 MM:SS`, warn in the last 10 seconds, and fail with「时间到了，还差×格。」The clock pauses during tips, the pause menu, and ads. Thief catches still say so.
 
 Query params for captures: `?shot=peek&level=N`, `?shot=walk&level=1` (L1 no fog), `?shot=walk&level=2` (disc), `?shot=path&level=1`, `?shot=hud&level=2`, `?shot=finger&level=1`, `?shot=key&level=11`, `?shot=chaser&level=21`, `?shot=tip&level=1`, `?shot=clear&level=1`.
 

@@ -61,7 +61,7 @@ export function mountDebugPanel(): void {
     render([]);
   };
   qs("#btn-debug-close").onclick = () => hidePanel();
-  bindLongPress(document.querySelector(".brand"), 650, showPanel);
+  bindLongPress(document.querySelector("#level-label"), 650, showPanel);
   bindLongPress(document.querySelector("#title-art"), 650, showPanel);
   bindLongPress(document.querySelector("#title-screen h1"), 650, showPanel);
   onAnalytics((_ev, all) => {

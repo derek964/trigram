@@ -76,6 +76,8 @@ export interface LevelConfig {
   wallWidth: number;
   parSteps: number;
   parTime: number;
+  /** Hard fail timeout in seconds. `0` = tutorial band, time only affects stars. */
+  timeLimit: number;
 }
 
 export function chapterOf(id: number): 1 | 2 | 3 {
@@ -118,6 +120,7 @@ export function recipe(id: number): LevelConfig {
   const wallWidth = 0.38;
   const braid = braidOf(id);
   const animal = ANIMALS[id - 1]!;
+  const parTime = id <= 3 ? 28 + id * 4 : 22 + id * 2.4;
   return {
     id,
     title: animal.title,
@@ -140,7 +143,8 @@ export function recipe(id: number): LevelConfig {
     cage: 1.85,
     wallWidth,
     parSteps: id <= 3 ? 16 + id * 4 : 50 + id * 8,
-    parTime: id <= 3 ? 28 + id * 4 : 22 + id * 2.4,
+    parTime,
+    timeLimit: id <= 5 ? 0 : Math.max(90, Math.round(parTime * 2.5)),
   };
 }
 

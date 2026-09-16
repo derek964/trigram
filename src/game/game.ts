@@ -18,7 +18,6 @@ import {
   collideMove,
   generateMaze,
   inPlayableFloor,
-  punchHole,
   shortestPath,
   type Maze,
 } from "./maze";
@@ -26,10 +25,23 @@ import { clamp, dist, lerp, type Vec2 } from "./math";
 import { loadProgress, markCleared, saveProgress, type Progress } from "./progress";
 import { emitClear, emitDeath } from "./ads";
 import { showInterstitial, showRewardedVideo, type RewardedScene } from "./ad-service";
+import {
+  countdownUrgent,
+  failKicker,
+  failReasonCopy,
+  formatCountdown,
+  hardTimeLimitSec,
+  playClockFrozen,
+  remainingTimeSec,
+  shouldTimeFail,
+  stepPlayClock,
+  type FailKind,
+} from "./play-clock";
+import { applyRepairTap, resolvePlayTap } from "./play-intent";
 import { drawWorld, fitPeekScale, type Camera, type Player } from "./render";
 import { UI_BUTTON_IDS, type UiButtonId } from "./ui-buttons";
 
-type Screen = "title" | "play" | "win" | "fail" | "ad" | "replay";
+type Screen = "title" | "play" | "win" | "fail" | "ad" | "replay" | "pause";
 type AdKind = "peek" | "heart" | "revive";
 
 interface UndoSnap {
@@ -111,8 +123,10 @@ export class Game {
   private hugT = 0;
   private replayPts: { x: number; y: number }[] = [];
   private replayT = 0;
-  private failKind: "thief" | "almost" = "almost";
+  private failKind: FailKind = "timeout";
+  private failHops = 0;
   private lastMoveTrack = 0;
+  private repairMode = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -124,6 +138,9 @@ export class Game {
     this.bindInput();
     this.resize();
     window.addEventListener("resize", () => this.resize());
+    if (typeof ResizeObserver !== "undefined") {
+      new ResizeObserver(() => this.resize()).observe(this.canvas);
+    }
     this.shotMode = new URLSearchParams(location.search).get("shot");
     this.renderTitleArt();
     if (this.shotMode) {
@@ -139,6 +156,10 @@ export class Game {
     this.onUi("btn-continue", () => this.startLevel(this.progress.current, false));
     this.onUi("btn-restart", () => this.startLevel(this.levelId, false, true));
     this.onUi("btn-peek", () => this.onPeek());
+    this.onUi("btn-repair", () => this.onRepair());
+    this.onUi("btn-pause", () => this.openPause());
+    this.onUi("btn-resume", () => this.closePause());
+    this.onUi("btn-pause-home", () => this.goTitle());
     this.onUi("btn-next", () => {
       if (this.levelId >= LEVEL_COUNT) this.goTitle();
       else this.startLevel(this.levelId + 1, false);
@@ -164,7 +185,9 @@ export class Game {
       if (!this.uiHandlers[id]) throw new Error(`missing click handler for #${id}`);
     }
     qs("#hud").addEventListener("pointerdown", (e) => e.stopPropagation());
+    qs("#dock").addEventListener("pointerdown", (e) => e.stopPropagation());
     qs("#btn-peek").addEventListener("pointerdown", (e) => e.stopPropagation());
+    qs("#btn-repair").addEventListener("pointerdown", (e) => e.stopPropagation());
     this.syncToggles();
     this.buildLevelRow();
   }
@@ -236,7 +259,7 @@ export class Game {
       this.pointer = { active: true, ox: e.clientX, oy: e.clientY, x: e.clientX, y: e.clientY, t0: performance.now() };
       this.hideFinger();
       unlockAudio();
-      this.showStick(true);
+      this.showStick(!this.repairMode);
     });
     el.addEventListener("pointermove", (e) => {
       if (!this.pointer.active) return;
@@ -283,6 +306,10 @@ export class Game {
       }
       if (e.key === "r" || e.key === "R") this.startLevel(this.levelId, false, true);
       if (e.key === "g" || e.key === "G") this.onPeek();
+      if (e.key === "Escape") {
+        if (this.screen === "pause") this.closePause();
+        else if (this.screen === "play") this.openPause();
+      }
     });
     window.addEventListener("keyup", (e) => {
       const map: Record<string, string> = {
@@ -348,6 +375,7 @@ export class Game {
     this.hugT = 0;
     this.replayT = 0;
     this.replayPts = [];
+    this.repairMode = false;
     this.hideFinger();
     qs("#dead-banner").classList.add("hidden");
     qs("#micro-cue").classList.add("hidden");
@@ -387,10 +415,13 @@ export class Game {
     qs("#win-screen").classList.add("hidden");
     qs("#fail-screen").classList.add("hidden");
     qs("#ad-screen").classList.add("hidden");
-    qs("#hud").classList.remove("hidden");
+    qs("#pause-screen").classList.add("hidden");
+    this.setRunChrome(true);
     if (!fromShot || this.shotMode !== "tip") qs("#tip-banner").classList.add("hidden");
     qs("#peek-badge").classList.toggle("hidden", !this.peeking);
+    this.setRepairMode(false);
     this.syncHud();
+    this.resize();
     document.body.dataset.ready = "1";
     if (!fromShot) {
       track(retry ? "level_retry" : "level_start", { level: cfg.id, chapter: cfg.chapter });
@@ -477,7 +508,8 @@ export class Game {
     qs("#win-screen").classList.add("hidden");
     qs("#fail-screen").classList.add("hidden");
     qs("#ad-screen").classList.add("hidden");
-    qs("#hud").classList.add("hidden");
+    qs("#pause-screen").classList.add("hidden");
+    this.setRunChrome(false);
     qs("#peek-badge").classList.add("hidden");
     qs("#tip-banner").classList.add("hidden");
     qs("#dead-banner").classList.add("hidden");
@@ -489,6 +521,7 @@ export class Game {
   private onPeek(): void {
     if (this.screen !== "play" || this.escorting) return;
     if (!usesVisionDisc(this.levelId)) return;
+    this.setRepairMode(false);
     if (this.peeking) {
       this.peeking = false;
       qs("#peek-badge").classList.add("hidden");
@@ -514,46 +547,98 @@ export class Game {
     this.tipCooldown = true;
   }
 
-  private tryTap(cx: number, cy: number): void {
-    if (this.escorting) return;
-    const world = this.screenToWorld(cx, cy);
-    if (this.levelId > 1 && this.hearts > 0 && punchHole(this.maze, world)) {
-      this.hearts -= 1;
-      this.holeFlash = world;
-      this.holeFlashT = 0.7;
-      this.stuckT = 0;
-      this.loopT = 0;
-      rumble(this.progress.vib, VIBE.medium);
-      playSfx("hole", this.progress.sfx);
-      if (!this.shotMode) track("repair_use", { level: this.levelId, remaining: this.hearts });
-      this.toast("开了一个检修口");
-      this.syncHud();
+  private onRepair(): void {
+    if (this.screen !== "play" || this.escorting) return;
+    if (this.levelId <= 1) return;
+    if (this.repairMode) {
+      this.setRepairMode(false);
+      this.toast("取消检修");
       return;
     }
-    if (this.hearts <= 0 && this.nearWall(world)) {
+    if (this.hearts <= 0) {
       this.openAd("heart");
       return;
     }
+    this.peeking = false;
+    qs("#peek-badge").classList.add("hidden");
+    this.setRepairMode(true);
+  }
+
+  private openPause(): void {
+    if (this.screen !== "play") return;
+    this.setRepairMode(false);
+    this.pointer.active = false;
+    this.showStick(false);
+    this.screen = "pause";
+    this.setRunChrome(false);
+    qs("#pause-screen").classList.remove("hidden");
+  }
+
+  private closePause(): void {
+    if (this.screen !== "pause") return;
+    qs("#pause-screen").classList.add("hidden");
+    this.screen = "play";
+    this.setRunChrome(true);
+    this.syncHud();
+  }
+
+  private setRepairMode(on: boolean): void {
+    this.repairMode = on;
+    const btn = document.querySelector("#btn-repair");
+    btn?.classList.toggle("armed", on);
+    qs("#repair-hint").classList.toggle("hidden", !on);
+    if (on) {
+      this.autoRoute = null;
+      this.toast("点发光的墙开检修口");
+    }
+  }
+
+  private setRunChrome(on: boolean): void {
+    const teach = this.levelId === 1 && this.shotMode !== "hud";
+    qs("#hud").classList.toggle("hidden", !on);
+    qs("#dock").classList.toggle("hidden", !on || teach);
+    if (!on) {
+      this.repairMode = false;
+      qs("#repair-hint").classList.add("hidden");
+      document.querySelector("#btn-repair")?.classList.remove("armed");
+    }
+  }
+
+  private tryTap(cx: number, cy: number): void {
+    if (this.escorting) return;
+    const world = this.screenToWorld(cx, cy);
+    const action = resolvePlayTap(this.maze, world, this.repairMode, this.hearts);
+    if (action === "repair") {
+      if (applyRepairTap(this.maze, world)) {
+        this.hearts -= 1;
+        this.holeFlash = world;
+        this.holeFlashT = 0.7;
+        this.stuckT = 0;
+        this.loopT = 0;
+        rumble(this.progress.vib, VIBE.medium);
+        playSfx("hole", this.progress.sfx);
+        if (!this.shotMode) track("repair_use", { level: this.levelId, remaining: this.hearts });
+        this.toast("开了一个检修口");
+        this.syncHud();
+      }
+      this.setRepairMode(false);
+      return;
+    }
+    if (action === "offer-heart") {
+      this.setRepairMode(false);
+      this.openAd("heart");
+      return;
+    }
+    if (action === "cancel" || action === "cancel-move") {
+      this.setRepairMode(false);
+      if (action === "cancel") return;
+    }
+    if (action === "noop") return;
     if (this.onApproachPath(world)) {
-      this.toast("走进平面图，点格子走路或点墙壁开检修口");
+      this.toast("走进平面图，点格子走路。开检修口请先点「检修」");
       return;
     }
     this.tryTapMove(world);
-  }
-
-  private nearWall(p: { x: number; y: number }): boolean {
-    const r = this.maze.wallHalf + 0.18;
-    for (const s of this.maze.segments) {
-      const dx = s.b.x - s.a.x;
-      const dy = s.b.y - s.a.y;
-      const len2 = dx * dx + dy * dy || 1;
-      let t = ((p.x - s.a.x) * dx + (p.y - s.a.y) * dy) / len2;
-      t = Math.max(0, Math.min(1, t));
-      const hx = s.a.x + dx * t;
-      const hy = s.a.y + dy * t;
-      if (Math.hypot(p.x - hx, p.y - hy) < r) return true;
-    }
-    return false;
   }
 
   private tryTapMove(world: { x: number; y: number }): void {
@@ -655,6 +740,8 @@ export class Game {
     this.screen = "ad";
     this.adWatching = false;
     this.adT = 0;
+    this.setRepairMode(false);
+    this.setRunChrome(false);
     const titles: Record<AdKind, [string, string]> = {
       peek: ["监控次数用完了", "看视频可恢复 1 次监控（激励广告占位）"],
       heart: ["检修次数用完了", "看视频可恢复 1 次检修，用来开检修口"],
@@ -673,6 +760,8 @@ export class Game {
     qs("#ad-screen").classList.add("hidden");
     this.screen = "play";
     this.adWatching = false;
+    this.setRunChrome(true);
+    this.syncHud();
   }
 
   private watchAd(): void {
@@ -722,7 +811,7 @@ export class Game {
   }
 
   private stickVec(): Vec2 {
-    if (!this.pointer.active) return { x: 0, y: 0 };
+    if (!this.pointer.active || this.repairMode) return { x: 0, y: 0 };
     const dx = this.pointer.x - this.pointer.ox;
     const dy = this.pointer.y - this.pointer.oy;
     const l = Math.hypot(dx, dy);
@@ -863,11 +952,15 @@ export class Game {
         this.stepAcc -= 1;
         this.steps += 1;
       }
-      qs("#step-count").textContent = String(this.steps);
     }
 
-    this.playTime += dt;
-    qs("#time-count").textContent = this.fmtTime(this.playTime);
+    const clockFrozen = playClockFrozen({
+      tipOpen: !qs("#tip-banner").classList.contains("hidden"),
+      pauseOpen: this.screen === "pause",
+      adOpen: this.screen === "ad",
+    });
+    this.playTime = stepPlayClock(this.playTime, dt, clockFrozen);
+    this.syncTimeHud();
 
     if (this.maze.keyPos && !this.hasKey && dist(this.player, this.maze.keyPos) < 0.5) {
       this.hasKey = true;
@@ -928,15 +1021,13 @@ export class Game {
         !this.tipCooldown &&
         qs("#tip-banner").classList.contains("hidden")
       ) {
-        qs("#tip-text").textContent = "好像绕晕了？点墙壁开「检修口」——花一次检修从墙根钻过去。";
+        qs("#tip-text").textContent = "好像绕晕了？点底部「检修」，再点发光的墙开检修口。";
         qs("#tip-banner").classList.remove("hidden");
       }
     }
 
-    if (this.levelId <= 5 && !this.escorting) {
-      const hops = this.feedback ? currentHops(this.feedback) : 99;
-      const limit = this.levelId <= 2 ? 50 : 62;
-      if (this.playTime > limit && hops > 2) this.fail("almost");
+    if (!this.escorting && !clockFrozen && shouldTimeFail(this.levelId, this.playTime)) {
+      this.fail("timeout");
     }
 
     const peekCam = fitPeekScale(this.maze, this.viewW(), this.viewH());
@@ -1045,6 +1136,7 @@ export class Game {
     qs("#win-screen").classList.remove("hidden");
     qs("#peek-badge").classList.add("hidden");
     qs("#tip-banner").classList.add("hidden");
+    this.setRunChrome(false);
     const interstitial = emitClear(this.levelId);
     if (!this.shotMode) {
       track("level_clear", { level: this.levelId, stars, steps: this.steps });
@@ -1056,10 +1148,12 @@ export class Game {
     }
   }
 
-  private fail(kind: "thief" | "almost"): void {
+  private fail(kind: FailKind): void {
     if (this.screen !== "play" || this.escorting) return;
     this.hideFinger();
+    this.setRepairMode(false);
     this.failKind = kind;
+    this.failHops = this.feedback ? currentHops(this.feedback) : 0;
     this.replayPts = (this.feedback?.trail ?? [])
       .map((id) => this.maze.cells[id])
       .filter((c): c is NonNullable<typeof c> => !!c)
@@ -1101,15 +1195,13 @@ export class Game {
   private showFailPanel(): void {
     if (this.screen === "fail") return;
     this.screen = "fail";
-    const thief = this.failKind === "thief";
-    qs("#fail-kicker").textContent = thief ? "糟了" : "差一点";
+    this.setRunChrome(false);
+    qs("#fail-kicker").textContent = failKicker(this.failKind);
     qs("#fail-title").textContent = "再试一次";
-    qs("#fail-reason").textContent = thief
-      ? "被偷宠贼拦住了。"
-      : "这条路还可以再顺一点。";
-    qs("#btn-fail-ad").classList.toggle("hidden", !thief || this.levelId < 11);
+    qs("#fail-reason").textContent = failReasonCopy(this.failKind, this.failHops);
+    qs("#btn-fail-ad").classList.toggle("hidden", this.failKind !== "thief" || this.levelId < 11);
     qs("#fail-screen").classList.remove("hidden");
-    if (thief) emitDeath(this.levelId);
+    if (this.failKind === "thief") emitDeath(this.levelId);
   }
 
   private fmtTime(t: number): string {
@@ -1121,25 +1213,30 @@ export class Game {
 
   private syncHud(): void {
     const cfg = this.maze.config;
-    qs("#level-label").textContent = `第${cfg.id}关 · ${cfg.title}`;
-    qs("#step-count").textContent = String(this.steps);
+    qs("#level-label").textContent = `第${cfg.id}关`;
     qs("#peek-count").textContent = String(this.peeksLeft);
     const charges = "▣".repeat(this.hearts) + "□".repeat(Math.max(0, 3 - this.hearts));
     qs("#heart-count").textContent = charges;
-    qs("#charge-stat").setAttribute("aria-label", `检修口剩余 ${this.hearts} 次`);
+    qs("#btn-repair").setAttribute("aria-label", `检修口剩余 ${this.hearts} 次`);
     qs("#btn-peek").setAttribute("aria-label", `监控剩余 ${this.peeksLeft} 次`);
     const teach = this.levelId === 1 && this.shotMode !== "hud";
-    qs("#charge-stat").classList.toggle("hidden", teach);
-    qs("#btn-peek").classList.toggle("hidden", teach);
-    qs("#btn-undo").classList.toggle("hidden", teach);
     qs("#stick-hint").textContent = teach ? "点格子走到隔离间" : "点格子走路 · 拖动手势或 WASD";
-    const keyStat = qs("#key-stat");
-    if (!cfg.needsKey) keyStat.classList.add("hidden");
-    else {
-      keyStat.classList.remove("hidden");
-      qs("#key-count").textContent = this.hasKey ? "已拿到" : "寻找中";
-    }
+    this.syncTimeHud();
     this.syncProxHud();
+  }
+
+  private syncTimeHud(): void {
+    const el = qs("#time-count");
+    const limit = hardTimeLimitSec(this.levelId);
+    if (!limit) {
+      el.classList.add("hidden");
+      el.classList.remove("warn");
+      return;
+    }
+    const left = remainingTimeSec(this.playTime, limit);
+    el.classList.remove("hidden");
+    el.textContent = `剩余 ${formatCountdown(left)}`;
+    el.classList.toggle("warn", countdownUrgent(left));
   }
 
   private applyVisit(ev: { closer: boolean; farther: boolean; deadEnd: boolean }): void {
@@ -1170,12 +1267,12 @@ export class Game {
     if (!this.feedback) return;
     const pct = Math.round(this.feedback.lastValue * 100);
     qs("#prox-pct").textContent = `${pct}%`;
-    qs("#prox-phase").textContent = currentPhase(this.feedback) === "key" ? "值班钥匙" : "隔离间";
-    (qs("#prox-fill") as HTMLDivElement).style.width = `${pct}%`;
+    const phase = currentPhase(this.feedback);
+    qs("#prox-phase").textContent = phase === "key" ? "找值班钥匙" : "接近隔离间";
     qs("#prox-wrap").setAttribute("aria-valuenow", String(pct));
     qs("#prox-wrap").setAttribute(
       "aria-label",
-      `接近 ${currentPhase(this.feedback) === "key" ? "值班钥匙" : "隔离间"} ${pct}%`,
+      `接近 ${phase === "key" ? "值班钥匙" : "隔离间"} ${pct}%`,
     );
   }
 
@@ -1304,6 +1401,7 @@ export class Game {
       clearPulse: this.clearPulse,
       hugScale: this.hugT > 0 ? 1 + this.hugT * 0.75 : 1,
       ghost: this.replayGhost(),
+      repairMode: this.repairMode,
     });
   }
 

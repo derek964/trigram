@@ -1,5 +1,5 @@
 import type { Chaser } from "./chaser";
-import type { Maze } from "./maze";
+import { isApproachStroke, type Maze } from "./maze";
 import { angLerp, angNorm, type Vec2 } from "./math";
 import { drawAnimalSprite, drawThief, drawVolunteer } from "./sprites";
 
@@ -38,6 +38,7 @@ export interface RenderView {
   clearPulse?: number;
   hugScale?: number;
   ghost?: { x: number; y: number; facing: number } | null;
+  repairMode?: boolean;
 }
 
 /** Follow-cam circular vision radius, world units. L2 uses 2.2; L3+ uses 2.0. L1 is full-bright. */
@@ -63,6 +64,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, w: number, h: number, v
   drawTrail(ctx, maze, view.trail, player, view.trailMood ?? 0, view.trailPulse ?? 0);
   drawChamberFloor(ctx, maze, view.hasKey);
   drawWalls(ctx, maze);
+  if (view.repairMode) drawRepairHighlight(ctx, maze, time);
   if (maze.locked) drawCageDoor(ctx, maze);
   drawIsolationGlow(ctx, maze, time);
   if (maze.keyPos && !view.hasKey) drawKey(ctx, maze.keyPos, time);
@@ -335,6 +337,33 @@ function drawWalls(ctx: CanvasRenderingContext2D, maze: Maze): void {
   };
   paint("rgba(47, 109, 98, 0.22)", WALL_DRAW_WIDTH + 0.05, 0.02, 0.025);
   paint("#2b6b5e", WALL_DRAW_WIDTH);
+}
+
+function drawRepairHighlight(ctx: CanvasRenderingContext2D, maze: Maze, time: number): void {
+  const pulse = 0.45 + Math.sin(time * 6) * 0.2;
+  ctx.save();
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.strokeStyle = `rgba(255, 123, 107, ${pulse})`;
+  ctx.lineWidth = WALL_DRAW_WIDTH + 0.11;
+  ctx.beginPath();
+  for (const s of maze.strokes) {
+    if (isApproachStroke(maze, s)) continue;
+    if (s.kind === "arc") {
+      const a0 = angNorm(s.th0);
+      const span = Math.max(0.01, angLerp(s.th0, s.th1));
+      ctx.moveTo(s.r * Math.cos(a0), s.r * Math.sin(a0));
+      ctx.arc(0, 0, s.r, a0, a0 + span);
+    } else if (s.kind === "radial") {
+      ctx.moveTo(s.ri * Math.cos(s.th), s.ri * Math.sin(s.th));
+      ctx.lineTo(s.ro * Math.cos(s.th), s.ro * Math.sin(s.th));
+    } else {
+      ctx.moveTo(s.a.x, s.a.y);
+      ctx.lineTo(s.b.x, s.b.y);
+    }
+  }
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawWallSilhouette(

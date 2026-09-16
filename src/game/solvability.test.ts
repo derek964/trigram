@@ -43,6 +43,8 @@ test("campaign ships 30 square levels with shelter chapter names", () => {
     else if (cfg.id <= 20) assert.equal(cfg.pattern, "E");
     else assert.equal(cfg.pattern, "F");
     assert.equal(usesVisionDisc(cfg.id), cfg.id >= 2, `L${cfg.id} vision drip`);
+    if (cfg.id <= 5) assert.equal(cfg.timeLimit, 0, `L${cfg.id} tutorial band must not hard-fail on time`);
+    else assert.ok(cfg.timeLimit >= 90, `L${cfg.id} later levels keep a generous countdown`);
   }
 });
 
