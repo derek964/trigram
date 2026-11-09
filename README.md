@@ -1,6 +1,12 @@
 # 拯救小动物
 
-> Hitman GO rewrite P0：`?mode=go`（节点图 + 邻接移动，禁等待）。Theseus `?mode=chase` 仅参考。
+Default page is a free-walk paper maze (`src/walk/`): hold arrows or WASD, or the on-screen pad. Walls stop and slide. Reach the flag and press 重开. `?mode=go`, `?mode=chase`, and `?mode=shelter` still boot the older playtest and are not the default.
+
+`public/art/hunter.png` is one transparent pose. There is no facing sheet and no walk-cycle sheet.
+
+## Older playtest notes
+
+> Hitman GO rewrite P0：`?mode=go`（节点图 + 邻接移动，禁等待）。Theseus `?mode=chase` 仅参考。 The Nov 9 playtest booted that board. `origin/main` did not contain `src/go` or `public/art`.
 
 微信小游戏 **「拯救小动物」** — night-shift volunteer on a pet-shelter floor-plan. Enter at the south gate, free the animal in the **隔离间**, and watch it pathfind out.
 
