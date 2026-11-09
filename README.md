@@ -1,8 +1,15 @@
 # 拯救小动物
 
+> Hitman GO rewrite P0：`?mode=go`（节点图 + 邻接移动，禁等待）。Theseus `?mode=chase` 仅参考。
+
 微信小游戏 **「拯救小动物」** — night-shift volunteer on a pet-shelter floor-plan. Enter at the south gate, free the animal in the **隔离间**, and watch it pathfind out.
 
 **Vite + TypeScript + Canvas 2D**, plus a `wechat-minigame/` scaffold for 微信开发者工具. Progress is stored in `localStorage` under `save-animals-shelter-v1`. Source: [https://github.com/derek964/trigram](https://github.com/derek964/trigram).
+
+
+## Hitman GO board (maze grid)
+
+Presentation is an orthogonal **maze grid**: walkable cells = GO nodes, orthogonal neighbors = edges, blocked cells = solid wall/bush/stone props. Rules kernel unchanged (1 step / beat, E1, overlays, rescue). Levels live on an integer lattice (`src/go/levels.ts`); board fill is derived in `src/go/maze-grid.ts`.
 
 ## Run
 
@@ -80,11 +87,29 @@ Chapter 3 only. Same move speed as the player (`SPEED`).
 
 Static solvability is gated (south gate → key if needed → center). Chase is a skill check, not a lock.
 
+## Hitman GO QA / solvability
+
+```bash
+npm test
+npm run solvability   # fail-loud BFS: every explore+chase birth→cage→camp
+```
+
+Level table build (`src/go/levels.ts`) reject-samples seeds until both modes BFS-solve under full bow. `npm run solvability` re-asserts the shipped table and prints depth/seed.
+
+**Dev-only chase unlock for 测试** (does not clear explore progress):
+
+```
+https://onyx-cipher-3bdv.here.now/?mode=go&level=2&forceChase=1
+```
+
+`forceChase=1` (also `true`/`yes`) bypasses same-S explore lock so chase L2/4/6/8 can be opened without grinding explore. Production progression still requires clearing the paired explore first when the flag is absent.
+
 ## Tests
 
 ```bash
 npm test
 npm run sim:levels
+npm run solvability
 ```
 
 `npm test` is the CI gate for **structure**, ads, audio/haptic, and analytics:

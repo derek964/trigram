@@ -2,7 +2,7 @@ import { INTERSTITIAL_LEVELS, INTERSTITIAL_AD_UNIT_ID, REWARD_AD_UNIT_ID } from 
 import { getWx, type WxInterstitialAd, type WxRewardedAd } from "../wx-api";
 
 export type AdResult = "success" | "fail" | "cancel";
-export type RewardedScene = "peek" | "heart" | "revive";
+export type RewardedScene = "peek" | "heart" | "revive" | "undo3" | "freeze" | "hint";
 
 export interface AdShowRequest {
   kind: "rewarded" | "interstitial";
