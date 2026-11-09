@@ -1,14 +1,14 @@
 import { GOAL, GOAL_RADIUS, MAZE_GRID, PLAYER_RADIUS, START, type Grid } from "./maze";
 
 export const MOVE_SPEED = 2.55;
-export const WALK_PHASE_PER_UNIT = 10.5;
+export const WALK_PHASE_PER_UNIT = 3.6;
 
 export interface Walker {
   x: number;
   y: number;
   /** Radians. 0 = east, +π/2 = south. Follows the last actual displacement. */
   facing: number;
-  /** True when actual movement went west. One pose only; see art note in play.ts. */
+  /** Kept so west still reports a side. The drawn facing is the cardinal of `facing`. */
   flip: boolean;
   phase: number;
   moving: boolean;
@@ -82,11 +82,6 @@ export function poseFromDelta(
   if (dx < -1e-5) flip = true;
   else if (dx > 1e-5) flip = false;
   return { facing: Math.atan2(dy, dx), flip };
-}
-
-/** Screen lean for north/south. East/west stay upright and are told apart by `flip`. */
-export function leanFromFacing(facing: number): number {
-  return Math.sin(facing) * 0.22;
 }
 
 export function stepWalker(w: Walker, stick: Stick, dt: number, grid: Grid = MAZE_GRID): Walker {

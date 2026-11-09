@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { GOAL, MAZE_GRID, PLAYER_RADIUS, START, deadEnds, junctions, shortestPath } from "./maze";
 import { circleBlocked, createWalker, moveCircle, stepWalker } from "./motion";
 import { HUNTER_URL, FACING_SHEET_COUNT, WALK_FRAME_COUNT } from "./art";
+import { cardinalFromFacing, facingRead, footPair, gait } from "./paper-hunter";
 
 test("maze branches, has a dead end that is not the flag, and reaches the flag", () => {
   const path = shortestPath();
@@ -100,11 +101,42 @@ test("following the floor path reaches the flag without entering a wall", () => 
   assert.equal(w.won, true);
 });
 
-test("hunter is the transparent png, and there is no facing or walk sheet", () => {
+test("hunter png is one pose, so the walker is a drawn figure with four reads", () => {
   assert.equal(HUNTER_URL, "art/hunter.png");
   assert.equal(HUNTER_URL.endsWith(".jpg"), false);
   assert.equal(FACING_SHEET_COUNT, 0);
   assert.equal(WALK_FRAME_COUNT, 0);
+  assert.equal(cardinalFromFacing(0), "E");
+  assert.equal(cardinalFromFacing(Math.PI / 2), "S");
+  assert.equal(cardinalFromFacing(Math.PI), "W");
+  assert.equal(cardinalFromFacing(-Math.PI / 2), "N");
+  const reads = (["N", "E", "S", "W"] as const).map((d) => JSON.stringify(facingRead(d)));
+  assert.equal(new Set(reads).size, 4);
+  assert.equal(facingRead("N").eyes, 0);
+  assert.equal(facingRead("S").eyes, 2);
+  assert.equal(facingRead("E").nose, 1);
+  assert.equal(facingRead("W").nose, -1);
+});
+
+test("gait plants one foot and swings the other without lifting the hips", () => {
+  for (const phase of [0, 0.4, 1.2, Math.PI, 4]) {
+    const g = gait(phase, true);
+    assert.equal(g.hipLift, 0);
+    assert.notEqual(g.back.planted, g.front.planted);
+    assert.ok(g.front.along - g.back.along > 0.15, `stride too small at ${phase}`);
+  }
+  const wide = gait(0.15, true);
+  assert.ok(wide.front.along - wide.back.along > 0.8);
+  const [a0, a1] = footPair(0.15);
+  const [b0, b1] = footPair(Math.PI + 0.15);
+  assert.ok(Math.abs(a0.along - b1.along) < 0.02);
+  assert.ok(Math.abs(a1.along - b0.along) < 0.02);
+  assert.notEqual(a0.planted, a1.planted);
+  const idle = gait(1, false);
+  assert.equal(idle.hipLift, 0);
+  assert.equal(idle.back.planted && idle.front.planted, true);
+  assert.equal(idle.back.lift, 0);
+  assert.equal(idle.front.lift, 0);
 });
 
 test("default entry constructs the freewalk maze, not GO", () => {
@@ -116,7 +148,8 @@ test("default entry constructs the freewalk maze, not GO", () => {
   assert.doesNotMatch(main, /new GoMode|go\.open|new Game\(/);
   assert.match(play, /walk-pad-n/);
   assert.match(play, /ArrowUp/);
-  assert.match(play, /art\/hunter\.png|HUNTER_URL/);
+  assert.match(play, /drawPaperHunter/);
+  assert.doesNotMatch(play, /leanFromFacing/);
   assert.doesNotMatch(html, /Hitman GO|点相邻节点|点相邻格子/);
   assert.match(html, /walk-mode/);
 });
