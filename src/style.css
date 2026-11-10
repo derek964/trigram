@@ -1223,7 +1223,8 @@ body.walk-mode .banner {
   background: #e6d5bf;
   touch-action: none;
 }
-.walk-hint {
+.walk-hint,
+#walk-limit {
   margin: 0;
   text-align: center;
   font-size: 13px;

@@ -1,11 +1,26 @@
 /**
  * Default playable maze. Continuous walk, not a node hop.
- * The walker is drawn by paper-hunter.ts. hunter.png cannot face or step.
+ * The picture is public/art/hunter.png until four RGBA walk sheets load.
+ * That file is one pose. It is not tilted into a fake step.
  */
-import { FLAG_URL, GRASS_URLS, PATH_URLS } from "./art";
+import { FLAG_URL, GRASS_URLS, HUNTER_URL, PATH_URLS } from "./art";
 import { GOAL, MAZE_GRID, MAZE_ROWS, START } from "./maze";
 import { createWalker, isWall, stepWalker, type Walker } from "./motion";
-import { cardinalFromFacing, drawPaperHunter, gait } from "./paper-hunter";
+import { hunterRect, project, shouldCutaway, wallDepth, wallRect, walkerDepth } from "./occlusion";
+import { cardinalFromFacing, type Cardinal } from "./paper-hunter";
+import {
+  HUNTER_BODY_SCALE,
+  WALL_RAISE_SCALE,
+  WALK_ANCHOR_X,
+  WALK_ANCHOR_Y,
+  WALK_FRAME_H,
+  WALK_FRAME_W,
+  WALK_FRAMES,
+  WALK_SHEET_URLS,
+  isRgbaPng,
+  sheetFrame,
+  sheetSizeOk,
+} from "./walk-sheets";
 
 type Img = HTMLImageElement;
 type Box = { sx: number; sy: number; sw: number; sh: number };
@@ -18,13 +33,28 @@ function assetUrl(path: string): string {
   return (base.endsWith("/") ? base : `${base}/`) + path;
 }
 
-function loadImage(path: string): Promise<Img | null> {
+function loadImage(src: string): Promise<Img | null> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => resolve(img.naturalWidth > 0 ? img : null);
     img.onerror = () => resolve(null);
-    img.src = assetUrl(path);
+    img.src = src;
   });
+}
+
+async function loadRgbaSheet(src: string): Promise<Img | null> {
+  if (!src.toLowerCase().split("?")[0]!.endsWith(".png")) return null;
+  try {
+    const res = await fetch(src);
+    if (!res.ok) return null;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (!isRgbaPng(bytes)) return null;
+    const img = await loadImage(URL.createObjectURL(new Blob([bytes], { type: "image/png" })));
+    if (!img || !sheetSizeOk(img.naturalWidth, img.naturalHeight)) return null;
+    return img;
+  } catch {
+    return null;
+  }
 }
 
 function opaqueBox(img: Img): Box {
@@ -55,10 +85,6 @@ function opaqueBox(img: Img): Box {
     /* use the full frame */
   }
   return { sx: 0, sy: 0, sw: img.naturalWidth, sh: img.naturalHeight };
-}
-
-function project(x: number, y: number, scale: number, ox: number, oy: number): { x: number; y: number } {
-  return { x: ox + (x - y) * scale * 0.5, y: oy + (x + y) * scale * 0.25 };
 }
 
 function poly(ctx: CanvasRenderingContext2D, pts: { x: number; y: number }[], fill: string): void {
@@ -97,11 +123,15 @@ export class WalkMode {
   private held = new Set<string>();
   private active = false;
   private last = 0;
+  private hunter: Img | null = null;
+  private hunterBox: Box | null = null;
+  private sheets: Partial<Record<Cardinal, Img>> = {};
   private flag: Img | null = null;
   private paths: Img[] = [];
   private grass: Img[] = [];
   private flagBox: Box | null = null;
   private readySent = false;
+  private cutaways = 0;
 
   constructor() {
     this.root = document.createElement("section");
@@ -136,13 +166,21 @@ export class WalkMode {
     this.status.textContent = "沿走廊走到绿旗";
   }
 
-  getState(): Walker & { cardinal: string; stride: number; hipLift: number } {
-    const step = gait(this.walker.phase, this.walker.moving);
+  getState(): Walker & {
+    cardinal: Cardinal;
+    presentation: "walk-sheet" | "interim-single-pose";
+    wallRaise: number;
+    bodyScale: number;
+    cutaways: number;
+  } {
+    const cardinal = cardinalFromFacing(this.walker.facing);
     return {
       ...this.walker,
-      cardinal: cardinalFromFacing(this.walker.facing),
-      stride: step.front.along - step.back.along,
-      hipLift: step.hipLift,
+      cardinal,
+      presentation: this.sheets[cardinal] ? "walk-sheet" : "interim-single-pose",
+      wallRaise: WALL_RAISE_SCALE,
+      bodyScale: HUNTER_BODY_SCALE,
+      cutaways: this.cutaways,
     };
   }
 
@@ -168,7 +206,8 @@ export class WalkMode {
 
     const hint = document.createElement("p");
     hint.className = "walk-hint";
-    hint.textContent = "按住方向键或 WASD。撞墙会停下，顺着墙滑开。";
+    hint.id = "walk-limit";
+    hint.textContent = "猎人是单张立绘。没有四向，也没有迈步。朝西只是镜像，不是行走动画。";
 
     const pad = document.createElement("div");
     pad.className = "walk-pad";
@@ -236,16 +275,33 @@ export class WalkMode {
   }
 
   private async loadArt(): Promise<void> {
-    const [flag, ...rest] = await Promise.all([
-      loadImage(FLAG_URL),
-      ...PATH_URLS.map((p) => loadImage(p)),
-      ...GRASS_URLS.map((p) => loadImage(p)),
+    const [hunter, flag, ...rest] = await Promise.all([
+      loadImage(assetUrl(HUNTER_URL)),
+      loadImage(assetUrl(FLAG_URL)),
+      ...PATH_URLS.map((p) => loadImage(assetUrl(p))),
+      ...GRASS_URLS.map((p) => loadImage(assetUrl(p))),
     ]);
+    this.hunter = hunter;
     this.flag = flag;
     this.paths = rest.slice(0, PATH_URLS.length).filter((img): img is Img => !!img);
     this.grass = rest.slice(PATH_URLS.length).filter((img): img is Img => !!img);
+    if (hunter) this.hunterBox = opaqueBox(hunter);
     if (flag) this.flagBox = opaqueBox(flag);
+    await this.loadSheets();
     this.markReady();
+  }
+
+  private async loadSheets(): Promise<void> {
+    const dirs = Object.keys(WALK_SHEET_URLS) as Cardinal[];
+    await Promise.all(
+      dirs.map(async (dir) => {
+        const img = await loadRgbaSheet(assetUrl(WALK_SHEET_URLS[dir]));
+        if (img) this.sheets[dir] = img;
+      }),
+    );
+    const missing = dirs.filter((dir) => !this.sheets[dir]);
+    const note = document.getElementById("walk-limit");
+    if (note && missing.length === 0) note.textContent = "四向行走帧已接入。";
   }
 
   private markReady(): void {
@@ -318,12 +374,14 @@ export class WalkMode {
       minY = Math.min(minY, p.y);
       maxY = Math.max(maxY, p.y);
     }
-    const availW = w * 0.84;
-    const availH = (h - padTop - padBottom) * 0.62;
-    const scale = Math.min(availW / Math.max(1, maxX - minX), availH / Math.max(1, maxY - minY));
-    const mid = project(COLS / 2, ROWS / 2, scale, 0, 0);
-    const ox = w / 2 - mid.x;
-    const oy = (padTop + (h - padBottom)) / 2 - mid.y + scale * 1.7;
+    const bw = Math.max(1, maxX - minX);
+    const bh = Math.max(1, maxY - minY);
+    const availW = w * 0.88;
+    const availH = (h - padTop - padBottom) * 0.78;
+    const scale = Math.min(availW / bw, availH / (bh + WALL_RAISE_SCALE));
+    const raise = WALL_RAISE_SCALE * scale;
+    const ox = w / 2 - ((minX + maxX) / 2) * scale;
+    const oy = padTop + raise + 10 - minY * scale;
     const at = (x: number, y: number) => project(x, y, scale, ox, oy);
 
     const footprint = [at(0.15, 0.15), at(COLS - 0.15, 0.15), at(COLS - 0.15, ROWS - 0.15), at(0.15, ROWS - 0.15)];
@@ -350,27 +408,39 @@ export class WalkMode {
       }
     }
 
-    type Item = { depth: number; draw: () => void };
-    const items: Item[] = [];
-    const raise = scale * 0.32;
+    const feet = at(this.walker.x, this.walker.y);
+    const bodyH = HUNTER_BODY_SCALE * scale;
+    const aspect = this.hunterBox ? this.hunterBox.sw / this.hunterBox.sh : 0.63;
+    const body = hunterRect(feet.x, feet.y, bodyH * aspect, bodyH);
+    const playerDepth = walkerDepth(this.walker.x, this.walker.y);
+    const walls: { c: number; r: number; depth: number; cut: boolean }[] = [];
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         if (!isWall(MAZE_GRID, c, r)) continue;
-        const depth = c + r + 0.35;
-        items.push({
-          depth,
-          draw: () => this.drawWall(c, r, scale, ox, oy, raise),
-        });
+        const depth = wallDepth(c, r);
+        const box = wallRect(c, r, scale, ox, oy, raise);
+        const pc = Math.floor(this.walker.x);
+        const pr = Math.floor(this.walker.y);
+        const near = Math.max(Math.abs(c - pc), Math.abs(r - pr)) <= 1;
+        walls.push({ c, r, depth, cut: shouldCutaway(depth, playerDepth, box, body, near) });
       }
     }
-    items.push({
-      depth: GOAL.x + GOAL.y + 0.05,
-      draw: () => this.drawFlag(scale, ox, oy),
-    });
-    items.sort((a, b) => a.depth - b.depth);
-    for (const item of items) item.draw();
-    // Drawn after the walls so the stride stays visible in a narrow corridor.
-    this.drawHunter(scale, ox, oy);
+    this.cutaways = walls.filter((cell) => cell.cut).length;
+    const paint = (cell: { c: number; r: number }, alpha: number) => {
+      this.ctx.save();
+      this.ctx.globalAlpha = alpha;
+      this.drawWall(cell.c, cell.r, scale, ox, oy, raise);
+      this.ctx.restore();
+    };
+    const behind = walls.filter((cell) => cell.depth <= playerDepth).sort((a, b) => a.depth - b.depth);
+    for (const cell of behind) paint(cell, 1);
+    if (GOAL.x + GOAL.y < playerDepth) this.drawFlag(scale, ox, oy);
+    this.drawHunter(feet.x, feet.y, bodyH);
+    const front = walls.filter((cell) => cell.depth > playerDepth && !cell.cut).sort((a, b) => a.depth - b.depth);
+    for (const cell of front) paint(cell, 1);
+    if (GOAL.x + GOAL.y >= playerDepth) this.drawFlag(scale, ox, oy);
+    const faded = walls.filter((cell) => cell.cut).sort((a, b) => a.depth - b.depth);
+    for (const cell of faded) paint(cell, 0.32);
   }
 
   private drawWall(c: number, r: number, scale: number, ox: number, oy: number, lift: number): void {
@@ -428,8 +498,47 @@ export class WalkMode {
     ctx.drawImage(img, box.sx, box.sy, box.sw, box.sh, p.x - fw * 0.28, p.y - fh, fw, fh);
   }
 
-  private drawHunter(scale: number, ox: number, oy: number): void {
-    const p = project(this.walker.x, this.walker.y, scale, ox, oy);
-    drawPaperHunter(this.ctx, p.x, p.y, this.walker.facing, this.walker.phase, this.walker.moving, scale);
+  /** Upright blit. No tilt and no hop. A loaded sheet supplies the step frames. */
+  private drawHunter(feetX: number, feetY: number, bodyH: number): void {
+    const ctx = this.ctx;
+    const cardinal = cardinalFromFacing(this.walker.facing);
+    const sheet = this.sheets[cardinal];
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(feetX, feetY + 2, bodyH * 0.22, bodyH * 0.08, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(70, 48, 28, 0.28)";
+    ctx.fill();
+    if (sheet) {
+      const px = bodyH / WALK_ANCHOR_Y;
+      const frame = sheetFrame(this.walker.phase, this.walker.moving, WALK_FRAMES);
+      ctx.drawImage(
+        sheet,
+        frame * WALK_FRAME_W,
+        0,
+        WALK_FRAME_W,
+        WALK_FRAME_H,
+        feetX - WALK_ANCHOR_X * px,
+        feetY - WALK_ANCHOR_Y * px,
+        WALK_FRAME_W * px,
+        WALK_FRAME_H * px,
+      );
+      ctx.restore();
+      return;
+    }
+    const img = this.hunter;
+    const box = this.hunterBox;
+    if (!img || !box) {
+      ctx.restore();
+      return;
+    }
+    const dw = bodyH * (box.sw / box.sh);
+    if (cardinal === "W") {
+      ctx.translate(feetX, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, box.sx, box.sy, box.sw, box.sh, -dw / 2, feetY - bodyH, dw, bodyH);
+    } else {
+      ctx.drawImage(img, box.sx, box.sy, box.sw, box.sh, feetX - dw / 2, feetY - bodyH, dw, bodyH);
+    }
+    ctx.restore();
   }
 }
