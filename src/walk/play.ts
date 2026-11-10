@@ -5,7 +5,7 @@
  */
 import { FLAG_URL, GRASS_URLS, HUNTER_URL, PATH_URLS } from "./art";
 import { GOAL, MAZE_GRID, MAZE_ROWS, START } from "./maze";
-import { createWalker, isWall, stepWalker, type Walker } from "./motion";
+import { WALK_CYCLE_DISTANCE, createWalker, isWall, stepWalker, type Walker } from "./motion";
 import { project, revealRect, shouldCutaway, wallDepth, wallSilhouette, walkerDepth } from "./occlusion";
 import { cardinalFromFacing, type Cardinal } from "./paper-hunter";
 import {
@@ -335,7 +335,7 @@ export class WalkMode {
     const missing = dirs.filter((dir) => !this.sheets[dir]);
     const note = document.getElementById("walk-limit");
     if (note && missing.length === 0) {
-      note.textContent = "v4 四帧，不是终稿。东西没抵消纵向，南北腿交叉，帧内仍滑，换向矛左右不一致。收脚默认关。";
+      note.textContent = `v5 周期${WALK_CYCLE_DISTANCE}，不是终稿。采样对齐不是帧内不滑。腰缝和换向矛未解。收脚默认关。`;
     } else if (note && missing.length) {
       note.textContent = `行走帧缺失：${missing.join(" ")}。缺的方向不用单张冒充迈步。`;
     }
@@ -363,7 +363,7 @@ export class WalkMode {
       view.kind === "walk" ? "走" : view.kind === "settle" ? `收${view.cell}` : this.walker.won ? "到旗立" : blocked ? "受阻立" : "立";
     const gate = this.settleWanted ? "收开" : "收关";
     const phase = this.walker.phase.toFixed(2);
-    el.textContent = `${this.buildLabel()} · 输入 ${held.join("") || "无"} · 朝${cardinal} · 相位${phase} · ${gate} · ${pose}`;
+    el.textContent = `${this.buildLabel()} c${WALK_CYCLE_DISTANCE} · 输入 ${held.join("") || "无"} · 朝${cardinal} · 相位${phase} · ${gate} · ${pose}`;
   }
 
   private poseNow(): { kind: "walk" | "settle" | "idle"; cell: number } {

@@ -1,9 +1,9 @@
 import { GOAL, GOAL_RADIUS, MAZE_GRID, PLAYER_RADIUS, START, type Grid } from "./maze";
 
 export const MOVE_SPEED = 2.55;
-/** One four-frame cycle at nominal speed. About 0.6s, 6.67 fps. */
-export const WALK_CYCLE_SEC = 0.6;
-export const WALK_PHASE_PER_UNIT = (Math.PI * 2) / (MOVE_SPEED * WALK_CYCLE_SEC);
+/** World distance for one four-frame cycle. 1.53 is the previous cycle, not a V5 calibration. */
+export const WALK_CYCLE_DISTANCE = 1.53;
+export const WALK_PHASE_PER_UNIT = (Math.PI * 2) / WALK_CYCLE_DISTANCE;
 
 export interface Walker {
   x: number;
