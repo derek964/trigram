@@ -45,6 +45,27 @@ export function poseKind(moving: boolean, idleReady: boolean): "walk" | "idle" {
   return !moving && idleReady ? "idle" : "walk";
 }
 
+/** Optional stop poses. Four cells, 70ms each. Not a movement. */
+export const SETTLE_MS = 70;
+export const SETTLE_FRAMES = 4;
+
+export function settleIndex(elapsedMs: number): number {
+  if (elapsedMs <= 0) return 0;
+  return Math.min(SETTLE_FRAMES - 1, Math.floor(elapsedMs / SETTLE_MS));
+}
+
+/** Walk wins as soon as the root moves again. Settle never extends the stop. */
+export function visualPose(
+  moving: boolean,
+  settleOn: boolean,
+  elapsedMs: number,
+  hasStrip: boolean,
+): "walk" | "settle" | "idle" {
+  if (moving) return "walk";
+  if (settleOn && hasStrip && elapsedMs < SETTLE_MS * SETTLE_FRAMES) return "settle";
+  return "idle";
+}
+
 const PNG_SIG = [137, 80, 78, 71, 13, 10, 26, 10];
 
 /** True only for an 8-bit RGBA PNG (color type 6). JPEG and RGB PNG fail. */

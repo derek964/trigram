@@ -21,9 +21,12 @@ import {
   WALK_SHEET_URLS,
   idleSizeOk,
   isRgbaPng,
+  SETTLE_FRAMES,
   poseKind,
+  settleIndex,
   sheetFrame,
   sheetSizeOk,
+  visualPose,
 } from "./walk-sheets";
 
 type Img = HTMLImageElement;
@@ -131,6 +134,11 @@ export class WalkMode {
   private hunterBox: Box | null = null;
   private sheets: Partial<Record<Cardinal, Img>> = {};
   private idles: Partial<Record<Cardinal, Img>> = {};
+  private settles: Record<string, Img> = {};
+  private settleWanted = false;
+  private settleStart = 0;
+  private settleFrom = 0;
+  private wasMoving = false;
   private flag: Img | null = null;
   private paths: Img[] = [];
   private grass: Img[] = [];
@@ -153,6 +161,7 @@ export class WalkMode {
     this.build();
     document.querySelector("#app")?.appendChild(this.root);
     this.bind();
+    this.settleWanted = new URLSearchParams(location.search).get("settle") === "1";
     void this.loadArt();
   }
 
@@ -314,12 +323,19 @@ export class WalkMode {
         if (img) this.sheets[dir] = img;
         const idle = await loadRgbaPng(assetUrl(IDLE_URLS[dir]), idleSizeOk);
         if (idle) this.idles[dir] = idle;
+        for (let frame = 0; frame < SETTLE_FRAMES; frame++) {
+          const pose = await loadRgbaPng(
+            assetUrl(`art/settle/hunter-${dir.toLowerCase()}-from-${frame}.png`),
+            sheetSizeOk,
+          );
+          if (pose) this.settles[`${dir}${frame}`] = pose;
+        }
       }),
     );
     const missing = dirs.filter((dir) => !this.sheets[dir]);
     const note = document.getElementById("walk-limit");
     if (note && missing.length === 0) {
-      note.textContent = "v4 四帧，不是终稿。东西没抵消纵向，南北腿交叉，帧内仍滑，换向矛左右不一致。";
+      note.textContent = "v4 四帧，不是终稿。东西没抵消纵向，南北腿交叉，帧内仍滑，换向矛左右不一致。收脚默认关。";
     } else if (note && missing.length) {
       note.textContent = `行走帧缺失：${missing.join(" ")}。缺的方向不用单张冒充迈步。`;
     }
@@ -341,11 +357,38 @@ export class WalkMode {
     if (this.held.has("s")) held.push("下");
     if (this.held.has("e")) held.push("右");
     const cardinal = cardinalFromFacing(this.walker.facing);
-    const standing = poseKind(this.walker.moving, !!this.idles[cardinal]) === "idle";
+    const view = this.poseNow();
     const blocked = held.length > 0 && !this.walker.moving && !this.walker.won;
-    const motion = this.walker.won ? "到旗立" : blocked ? "受阻立" : standing ? "立" : "走";
+    const pose =
+      view.kind === "walk" ? "走" : view.kind === "settle" ? `收${view.cell}` : this.walker.won ? "到旗立" : blocked ? "受阻立" : "立";
+    const gate = this.settleWanted ? "收开" : "收关";
     const phase = this.walker.phase.toFixed(2);
-    el.textContent = `${this.buildLabel()} · 输入 ${held.join("") || "无"} · 朝${cardinal} · 相位${phase} · ${motion}`;
+    el.textContent = `${this.buildLabel()} · 输入 ${held.join("") || "无"} · 朝${cardinal} · 相位${phase} · ${gate} · ${pose}`;
+  }
+
+  private poseNow(): { kind: "walk" | "settle" | "idle"; cell: number } {
+    const cardinal = cardinalFromFacing(this.walker.facing);
+    const elapsed = this.settleStart ? performance.now() - this.settleStart : Number.POSITIVE_INFINITY;
+    const strip = this.settles[`${cardinal}${this.settleFrom}`];
+    const kind = visualPose(this.walker.moving, this.settleWanted, elapsed, !!strip);
+    return { kind, cell: settleIndex(elapsed) };
+  }
+
+  /** Starts a pose-only settle when travel ends. Any new step clears it. */
+  private trackSettle(): void {
+    if (this.walker.moving) {
+      this.settleStart = 0;
+    } else if (this.wasMoving && this.settleWanted) {
+      const cardinal = cardinalFromFacing(this.walker.facing);
+      const from = sheetFrame(this.walker.phase, true, WALK_FRAMES);
+      if (this.settles[`${cardinal}${from}`]) {
+        this.settleFrom = from;
+        this.settleStart = performance.now();
+      } else {
+        this.settleStart = 0;
+      }
+    }
+    this.wasMoving = this.walker.moving;
   }
 
   private buildLabel(): string {
@@ -407,6 +450,7 @@ export class WalkMode {
     this.last = t;
     if (this.active) {
       this.walker = stepWalker(this.walker, this.stick(), dt || 0);
+      this.trackSettle();
       if (this.walker.won) {
         this.win.classList.remove("hidden");
         this.status.textContent = "走到绿旗了";
@@ -589,8 +633,25 @@ export class WalkMode {
     ctx.fillStyle = "rgba(70, 48, 28, 0.28)";
     ctx.fill();
     const px = bodyH / WALK_ANCHOR_Y;
+    const view = this.poseNow();
+    const settle = this.settles[`${cardinal}${this.settleFrom}`];
+    if (view.kind === "settle" && settle) {
+      ctx.drawImage(
+        settle,
+        view.cell * WALK_FRAME_W,
+        0,
+        WALK_FRAME_W,
+        WALK_FRAME_H,
+        feetX - WALK_ANCHOR_X * px,
+        feetY - WALK_ANCHOR_Y * px,
+        WALK_FRAME_W * px,
+        WALK_FRAME_H * px,
+      );
+      ctx.restore();
+      return;
+    }
     const idle = this.idles[cardinal];
-    if (idle && poseKind(this.walker.moving, true) === "idle") {
+    if (idle && view.kind === "idle") {
       ctx.drawImage(
         idle,
         0,

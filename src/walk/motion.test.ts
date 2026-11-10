@@ -6,7 +6,7 @@ import { circleBlocked, createWalker, moveCircle, stepWalker } from "./motion";
 import { HUNTER_URL, FACING_SHEET_COUNT, WALK_FRAME_COUNT } from "./art";
 import { revealRect, shouldCutaway, wallDepth, wallSilhouette, walkerDepth } from "./occlusion";
 import { cardinalFromFacing, facingRead, footPair, gait } from "./paper-hunter";
-import { idleSizeOk, isRgbaPng, poseKind, sheetFrame, wallTallerThanHunter } from "./walk-sheets";
+import { idleSizeOk, isRgbaPng, poseKind, settleIndex, sheetFrame, visualPose, wallTallerThanHunter } from "./walk-sheets";
 
 test("maze branches, has a dead end that is not the flag, and reaches the flag", () => {
   const path = shortestPath();
@@ -149,6 +149,18 @@ test("a held wall stop does not advance the walk phase", () => {
   for (let i = 0; i < 40; i++) w = stepWalker(w, { x: 0, y: -1 }, 1 / 30);
   assert.equal(w.phase, phase);
   assert.equal(sheetFrame(w.phase, false), 0);
+});
+
+test("settle is pose-only and a new step cuts it off", () => {
+  assert.equal(settleIndex(0), 0);
+  assert.equal(settleIndex(69), 0);
+  assert.equal(settleIndex(70), 1);
+  assert.equal(settleIndex(280), 3);
+  assert.equal(visualPose(false, true, 0, true), "settle");
+  assert.equal(visualPose(false, true, 280, true), "idle");
+  assert.equal(visualPose(true, true, 10, true), "walk");
+  assert.equal(visualPose(false, false, 10, true), "idle");
+  assert.equal(visualPose(false, true, 10, false), "idle");
 });
 
 test("a stop uses the stand pose only when that idle is loaded", () => {
