@@ -208,6 +208,10 @@ export class WalkMode {
     hint.className = "walk-hint";
     hint.id = "walk-limit";
     hint.textContent = "猎人是单张立绘。没有四向，也没有迈步。朝西只是镜像，不是行走动画。";
+    const input = document.createElement("p");
+    input.className = "walk-hint";
+    input.id = "walk-input";
+    input.textContent = "输入 无";
 
     const pad = document.createElement("div");
     pad.className = "walk-pad";
@@ -239,7 +243,7 @@ export class WalkMode {
     again.onclick = () => this.restart();
     this.win.append(msg, again);
 
-    this.root.append(top, stage, hint, pad, this.win);
+    this.root.append(top, stage, hint, input, pad, this.win);
   }
 
   private bindHold(btn: HTMLButtonElement, dir: string): void {
@@ -301,7 +305,11 @@ export class WalkMode {
     );
     const missing = dirs.filter((dir) => !this.sheets[dir]);
     const note = document.getElementById("walk-limit");
-    if (note && missing.length === 0) note.textContent = "四向行走帧已接入。";
+    if (note && missing.length === 0) {
+      note.textContent = "首批四向帧已接入，不是终稿。东西髋缝，南北迈步偏弱，换向武器不完全一致。";
+    } else if (note && missing.length) {
+      note.textContent = `行走帧缺失：${missing.join(" ")}。缺的方向不用单张冒充迈步。`;
+    }
   }
 
   private markReady(): void {
@@ -309,6 +317,21 @@ export class WalkMode {
     this.readySent = true;
     document.documentElement.dataset.freewalk = "ready";
     Object.assign(window, { __walkReady: true });
+  }
+
+  private syncInput(): void {
+    const el = document.getElementById("walk-input");
+    if (!el) return;
+    const held: string[] = [];
+    if (this.held.has("n")) held.push("上");
+    if (this.held.has("w")) held.push("左");
+    if (this.held.has("s")) held.push("下");
+    if (this.held.has("e")) held.push("右");
+    const cardinal = cardinalFromFacing(this.walker.facing);
+    const frame = sheetFrame(this.walker.phase, this.walker.moving, WALK_FRAMES);
+    const blocked = held.length > 0 && !this.walker.moving && !this.walker.won;
+    const motion = this.walker.won ? "到旗" : blocked ? "受阻停步" : this.walker.moving ? "在走" : "停";
+    el.textContent = `输入 ${held.join("") || "无"} · 朝${cardinal} · 帧${frame} · ${motion}`;
   }
 
   private stick(): { x: number; y: number } {
@@ -330,6 +353,7 @@ export class WalkMode {
         this.win.classList.remove("hidden");
         this.status.textContent = "走到绿旗了";
       }
+      this.syncInput();
       this.draw();
     }
     requestAnimationFrame(this.loop);

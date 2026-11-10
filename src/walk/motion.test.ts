@@ -141,6 +141,16 @@ test("gait plants one foot and swings the other without lifting the hips", () =>
   assert.equal(idle.front.lift, 0);
 });
 
+test("a held wall stop does not advance the walk phase", () => {
+  let w = createWalker();
+  for (let i = 0; i < 50; i++) w = stepWalker(w, { x: 0, y: -1 }, 1 / 30);
+  assert.equal(w.moving, false);
+  const phase = w.phase;
+  for (let i = 0; i < 40; i++) w = stepWalker(w, { x: 0, y: -1 }, 1 / 30);
+  assert.equal(w.phase, phase);
+  assert.equal(sheetFrame(w.phase, false), 0);
+});
+
 test("walls are taller than the hunter body", () => {
   assert.equal(wallTallerThanHunter(), true);
 });
