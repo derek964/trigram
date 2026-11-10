@@ -6,7 +6,7 @@
 import { FLAG_URL, GRASS_URLS, HUNTER_URL, PATH_URLS } from "./art";
 import { GOAL, MAZE_GRID, MAZE_ROWS, START } from "./maze";
 import { createWalker, isWall, stepWalker, type Walker } from "./motion";
-import { hunterRect, project, shouldCutaway, wallDepth, wallRect, walkerDepth } from "./occlusion";
+import { project, revealRect, shouldCutaway, wallDepth, wallSilhouette, walkerDepth } from "./occlusion";
 import { cardinalFromFacing, type Cardinal } from "./paper-hunter";
 import {
   HUNTER_BODY_SCALE,
@@ -356,32 +356,12 @@ export class WalkMode {
     ctx.fillStyle = "#e7d8c4";
     ctx.fillRect(0, 0, w, h);
 
-    const padTop = 8;
-    const padBottom = 8;
-    const corners = [
-      project(0, 0, 1, 0, 0),
-      project(COLS, 0, 1, 0, 0),
-      project(0, ROWS, 1, 0, 0),
-      project(COLS, ROWS, 1, 0, 0),
-    ];
-    let minX = Infinity;
-    let maxX = -Infinity;
-    let minY = Infinity;
-    let maxY = -Infinity;
-    for (const p of corners) {
-      minX = Math.min(minX, p.x);
-      maxX = Math.max(maxX, p.x);
-      minY = Math.min(minY, p.y);
-      maxY = Math.max(maxY, p.y);
-    }
-    const bw = Math.max(1, maxX - minX);
-    const bh = Math.max(1, maxY - minY);
-    const availW = w * 0.88;
-    const availH = (h - padTop - padBottom) * 0.78;
-    const scale = Math.min(availW / bw, availH / (bh + WALL_RAISE_SCALE));
+    const targetBody = Math.min(w, h) * 0.3;
+    const scale = targetBody / HUNTER_BODY_SCALE;
     const raise = WALL_RAISE_SCALE * scale;
-    const ox = w / 2 - ((minX + maxX) / 2) * scale;
-    const oy = padTop + raise + 10 - minY * scale;
+    const focus = project(this.walker.x, this.walker.y, scale, 0, 0);
+    const ox = w / 2 - focus.x;
+    const oy = h * 0.62 - focus.y;
     const at = (x: number, y: number) => project(x, y, scale, ox, oy);
 
     const footprint = [at(0.15, 0.15), at(COLS - 0.15, 0.15), at(COLS - 0.15, ROWS - 0.15), at(0.15, ROWS - 0.15)];
@@ -411,36 +391,40 @@ export class WalkMode {
     const feet = at(this.walker.x, this.walker.y);
     const bodyH = HUNTER_BODY_SCALE * scale;
     const aspect = this.hunterBox ? this.hunterBox.sw / this.hunterBox.sh : 0.63;
-    const body = hunterRect(feet.x, feet.y, bodyH * aspect, bodyH);
+    const bodyW = bodyH * aspect;
+    const reveal = revealRect(feet.x, feet.y, bodyW, bodyH, scale * 0.45);
     const playerDepth = walkerDepth(this.walker.x, this.walker.y);
     const walls: { c: number; r: number; depth: number; cut: boolean }[] = [];
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         if (!isWall(MAZE_GRID, c, r)) continue;
         const depth = wallDepth(c, r);
-        const box = wallRect(c, r, scale, ox, oy, raise);
-        const pc = Math.floor(this.walker.x);
-        const pr = Math.floor(this.walker.y);
-        const near = Math.max(Math.abs(c - pc), Math.abs(r - pr)) <= 1;
-        walls.push({ c, r, depth, cut: shouldCutaway(depth, playerDepth, box, body, near) });
+        const poly = wallSilhouette(c, r, scale, ox, oy, raise);
+        walls.push({ c, r, depth, cut: shouldCutaway(depth, playerDepth, poly, reveal) });
       }
     }
     this.cutaways = walls.filter((cell) => cell.cut).length;
-    const paint = (cell: { c: number; r: number }, alpha: number) => {
-      this.ctx.save();
-      this.ctx.globalAlpha = alpha;
-      this.drawWall(cell.c, cell.r, scale, ox, oy, raise);
-      this.ctx.restore();
-    };
+    const paint = (cell: { c: number; r: number }) => this.drawWall(cell.c, cell.r, scale, ox, oy, raise);
     const behind = walls.filter((cell) => cell.depth <= playerDepth).sort((a, b) => a.depth - b.depth);
-    for (const cell of behind) paint(cell, 1);
+    for (const cell of behind) paint(cell);
     if (GOAL.x + GOAL.y < playerDepth) this.drawFlag(scale, ox, oy);
     this.drawHunter(feet.x, feet.y, bodyH);
-    const front = walls.filter((cell) => cell.depth > playerDepth && !cell.cut).sort((a, b) => a.depth - b.depth);
-    for (const cell of front) paint(cell, 1);
+    const front = walls.filter((cell) => cell.depth > playerDepth).sort((a, b) => a.depth - b.depth);
+    for (const cell of front) {
+      if (!cell.cut) {
+        paint(cell);
+        continue;
+      }
+      // Solid everywhere except the hunter's own screen box.
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.rect(0, 0, w, h);
+      this.ctx.rect(reveal.x, reveal.y, reveal.w, reveal.h);
+      this.ctx.clip("evenodd");
+      paint(cell);
+      this.ctx.restore();
+    }
     if (GOAL.x + GOAL.y >= playerDepth) this.drawFlag(scale, ox, oy);
-    const faded = walls.filter((cell) => cell.cut).sort((a, b) => a.depth - b.depth);
-    for (const cell of faded) paint(cell, 0.32);
   }
 
   private drawWall(c: number, r: number, scale: number, ox: number, oy: number, lift: number): void {

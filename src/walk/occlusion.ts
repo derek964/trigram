@@ -1,4 +1,4 @@
-/** Depth and overlap for tall walls. Only a wall in front of the hunter, and covering the sprite, is faded. */
+/** Foreground depth. A wall fades only where its prism actually covers the hunter. */
 
 export interface Rect {
   x: number;
@@ -7,12 +7,13 @@ export interface Rect {
   h: number;
 }
 
-export function project(x: number, y: number, scale: number, ox: number, oy: number): { x: number; y: number } {
-  return { x: ox + (x - y) * scale * 0.5, y: oy + (x + y) * scale * 0.25 };
+export interface Pt {
+  x: number;
+  y: number;
 }
 
-export function rectsOverlap(a: Rect, b: Rect): boolean {
-  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+export function project(x: number, y: number, scale: number, ox: number, oy: number): Pt {
+  return { x: ox + (x - y) * scale * 0.5, y: oy + (x + y) * scale * 0.25 };
 }
 
 export function wallDepth(c: number, r: number): number {
@@ -23,38 +24,81 @@ export function walkerDepth(x: number, y: number): number {
   return x + y;
 }
 
-/** Screen box of a wall prism, including the raised top. */
-export function wallRect(c: number, r: number, scale: number, ox: number, oy: number, raise: number): Rect {
-  const pts = [
-    project(c, r, scale, ox, oy),
-    project(c + 1, r, scale, ox, oy),
-    project(c, r + 1, scale, ox, oy),
-    project(c + 1, r + 1, scale, ox, oy),
-  ];
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minY = Infinity;
-  let maxY = -Infinity;
-  for (const p of pts) {
-    minX = Math.min(minX, p.x);
-    maxX = Math.max(maxX, p.x);
-    minY = Math.min(minY, p.y - raise);
-    maxY = Math.max(maxY, p.y);
-  }
-  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+/** Silhouette of the wall prism: top back, top right, base right, base front, base left, top left. */
+export function wallSilhouette(c: number, r: number, scale: number, ox: number, oy: number, raise: number): Pt[] {
+  const p = (x: number, y: number) => project(x, y, scale, ox, oy);
+  const nw = p(c, r);
+  const ne = p(c + 1, r);
+  const sw = p(c, r + 1);
+  const se = p(c + 1, r + 1);
+  const up = (q: Pt): Pt => ({ x: q.x, y: q.y - raise });
+  return [up(nw), up(ne), ne, se, sw, up(sw)];
 }
 
 export function hunterRect(feetX: number, feetY: number, bodyW: number, bodyH: number): Rect {
   return { x: feetX - bodyW / 2, y: feetY - bodyH, w: bodyW, h: bodyH };
 }
 
-/** Fade this cell only. Walls behind the hunter, and front walls that miss the sprite, stay solid. */
-export function shouldCutaway(
-  depth: number,
-  playerDepth: number,
-  wall: Rect,
-  hunter: Rect,
-  near: boolean,
-): boolean {
-  return near && depth > playerDepth + 0.05 && rectsOverlap(wall, hunter);
+/** Body plus a strip of floor in front of the feet, so the cut shows contact. */
+export function revealRect(feetX: number, feetY: number, bodyW: number, bodyH: number, floorPad: number): Rect {
+  const padX = bodyW * 0.28;
+  return {
+    x: feetX - bodyW / 2 - padX,
+    y: feetY - bodyH * 1.04,
+    w: bodyW + padX * 2,
+    h: bodyH * 1.04 + floorPad,
+  };
+}
+
+export function pointInPoly(pt: Pt, poly: Pt[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i]!;
+    const b = poly[j]!;
+    const denom = b.y - a.y || 0.00001;
+    const hit = a.y > pt.y !== b.y > pt.y && pt.x < ((b.x - a.x) * (pt.y - a.y)) / denom + a.x;
+    if (hit) inside = !inside;
+  }
+  return inside;
+}
+
+function pointInRect(pt: Pt, r: Rect): boolean {
+  return pt.x >= r.x && pt.x <= r.x + r.w && pt.y >= r.y && pt.y <= r.y + r.h;
+}
+
+function segHit(a: Pt, b: Pt, c: Pt, d: Pt): boolean {
+  const cross = (p: Pt, q: Pt, r: Pt) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+  const d1 = cross(a, b, c);
+  const d2 = cross(a, b, d);
+  const d3 = cross(c, d, a);
+  const d4 = cross(c, d, b);
+  return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
+}
+
+export function rectHitsPoly(rect: Rect, poly: Pt[]): boolean {
+  const corners: Pt[] = [
+    { x: rect.x, y: rect.y },
+    { x: rect.x + rect.w, y: rect.y },
+    { x: rect.x, y: rect.y + rect.h },
+    { x: rect.x + rect.w, y: rect.y + rect.h },
+  ];
+  if (corners.some((p) => pointInPoly(p, poly))) return true;
+  if (poly.some((p) => pointInRect(p, rect))) return true;
+  const edges: [Pt, Pt][] = [
+    [corners[0]!, corners[1]!],
+    [corners[1]!, corners[3]!],
+    [corners[3]!, corners[2]!],
+    [corners[2]!, corners[0]!],
+  ];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]!;
+    const b = poly[(i + 1) % poly.length]!;
+    for (const [c, d] of edges) if (segHit(a, b, c!, d!)) return true;
+  }
+  return false;
+}
+
+/** True when this foreground prism covers the reveal rect. Several walls may. */
+export function shouldCutaway(depth: number, playerDepth: number, poly: Pt[], hunter: Rect): boolean {
+  return depth > playerDepth + 0.05 && rectHitsPoly(hunter, poly);
 }

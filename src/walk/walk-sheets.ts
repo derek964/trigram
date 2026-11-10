@@ -6,8 +6,8 @@
  */
 import type { Cardinal } from "./paper-hunter";
 
-export const HUNTER_BODY_SCALE = 0.9;
-/** Screen rise of a wall top above its base, in the same units as the body. */
+export const HUNTER_BODY_SCALE = 1.2;
+/** Screen rise of a wall top above its base. Stays above the hunter body. */
 export const WALL_RAISE_SCALE = 1.75;
 
 export const WALK_FRAME_W = 512;

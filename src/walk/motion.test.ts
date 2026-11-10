@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { GOAL, MAZE_GRID, PLAYER_RADIUS, START, deadEnds, junctions, shortestPath } from "./maze";
 import { circleBlocked, createWalker, moveCircle, stepWalker } from "./motion";
 import { HUNTER_URL, FACING_SHEET_COUNT, WALK_FRAME_COUNT } from "./art";
-import { hunterRect, shouldCutaway, wallDepth, wallRect, walkerDepth } from "./occlusion";
+import { revealRect, shouldCutaway, wallDepth, wallSilhouette, walkerDepth } from "./occlusion";
 import { cardinalFromFacing, facingRead, footPair, gait } from "./paper-hunter";
 import { isRgbaPng, sheetFrame, wallTallerThanHunter } from "./walk-sheets";
 
@@ -158,18 +158,20 @@ test("only an 8-bit RGBA PNG is a walk sheet", () => {
   assert.equal(sheetFrame(Math.PI, true), 2);
 });
 
-test("a front wall that covers the hunter fades; other walls do not", () => {
-  const hunter = hunterRect(120, 200, 40, 80);
-  const cover = { x: 100, y: 110, w: 70, h: 120 };
-  const aside = { x: 400, y: 110, w: 30, h: 40 };
-  assert.equal(shouldCutaway(8, 5, cover, hunter, true), true);
-  assert.equal(shouldCutaway(4, 5, cover, hunter, true), false);
-  assert.equal(shouldCutaway(8, 5, aside, hunter, true), false);
-  assert.equal(shouldCutaway(8, 5, cover, hunter, false), false);
+test("only a foreground prism that covers the hunter is opened", () => {
+  const scale = 100;
+  const raise = 175;
+  const hunter = revealRect(0, 40, 50, 90, 20);
+  const cover = wallSilhouette(0, 0, scale, -50, 80, raise);
+  const aside = wallSilhouette(6, 0, scale, -50, 80, raise);
+  assert.equal(shouldCutaway(8, 5, cover, hunter), true);
+  assert.equal(shouldCutaway(4, 5, cover, hunter), false);
+  assert.equal(shouldCutaway(8, 5, aside, hunter), false);
   assert.ok(wallDepth(3, 4) > walkerDepth(3.2, 2.2));
   assert.ok(wallDepth(3, 1) < walkerDepth(3.2, 2.2));
-  const raised = wallRect(0, 0, 10, 0, 0, 40);
-  assert.ok(raised.h > 40);
+  const top = wallSilhouette(0, 0, scale, 0, 0, raise)[0]!;
+  const base = wallSilhouette(0, 0, scale, 0, 0, raise)[3]!;
+  assert.ok(base.y - top.y > 90);
 });
 
 test("default entry constructs the freewalk maze, not GO", () => {
