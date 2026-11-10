@@ -15,6 +15,7 @@ import {
   WALK_ANCHOR_Y,
   WALK_FRAME_H,
   WALK_FRAME_W,
+  WALK_BATCH,
   WALK_FRAMES,
   WALK_SHEET_URLS,
   isRgbaPng,
@@ -208,6 +209,10 @@ export class WalkMode {
     hint.className = "walk-hint";
     hint.id = "walk-limit";
     hint.textContent = "猎人是单张立绘。没有四向，也没有迈步。朝西只是镜像，不是行走动画。";
+    const section = document.createElement("p");
+    section.className = "walk-hint";
+    section.id = "walk-section";
+    section.textContent = "第二批";
     const input = document.createElement("p");
     input.className = "walk-hint";
     input.id = "walk-input";
@@ -243,7 +248,7 @@ export class WalkMode {
     again.onclick = () => this.restart();
     this.win.append(msg, again);
 
-    this.root.append(top, stage, hint, input, pad, this.win);
+    this.root.append(top, stage, hint, section, input, pad, this.win);
   }
 
   private bindHold(btn: HTMLButtonElement, dir: string): void {
@@ -306,7 +311,7 @@ export class WalkMode {
     const missing = dirs.filter((dir) => !this.sheets[dir]);
     const note = document.getElementById("walk-limit");
     if (note && missing.length === 0) {
-      note.textContent = "首批四向帧已接入，不是终稿。东西髋缝，南北迈步偏弱，换向武器不完全一致。";
+      note.textContent = "第二批行走帧，不是终稿。斗篷仍挡住南北迈步，东向矛的手和轮廓还要改。";
     } else if (note && missing.length) {
       note.textContent = `行走帧缺失：${missing.join(" ")}。缺的方向不用单张冒充迈步。`;
     }
@@ -331,7 +336,51 @@ export class WalkMode {
     const frame = sheetFrame(this.walker.phase, this.walker.moving, WALK_FRAMES);
     const blocked = held.length > 0 && !this.walker.moving && !this.walker.won;
     const motion = this.walker.won ? "到旗" : blocked ? "受阻停步" : this.walker.moving ? "在走" : "停";
-    el.textContent = `输入 ${held.join("") || "无"} · 朝${cardinal} · 帧${frame} · ${motion}`;
+    el.textContent = `${this.buildLabel()} · 输入 ${held.join("") || "无"} · 朝${cardinal} · 帧${frame} · ${motion}`;
+  }
+
+  private buildLabel(): string {
+    const src = [...document.scripts].map((script) => script.src).find((item) => item.includes("index-")) ?? "";
+    const match = src.match(/index-[A-Za-z0-9_-]+/);
+    return `${WALK_BATCH} ${match?.[0] ?? "dev"}`;
+  }
+
+  /** Lowest solid boot row in the sheet this loop is actually drawing. No per-frame shift. */
+  auditFeet(): Record<string, { frame: number; low: number; onGround: number; otherLow: number }[]> {
+    const out: Record<string, { frame: number; low: number; onGround: number; otherLow: number }[]> = {};
+    for (const dir of Object.keys(this.sheets) as Cardinal[]) {
+      const img = this.sheets[dir];
+      if (!img) continue;
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) continue;
+      ctx.drawImage(img, 0, 0);
+      const rows = [];
+      for (let frame = 0; frame < WALK_FRAMES; frame++) {
+        const data = ctx.getImageData(frame * WALK_FRAME_W, 0, WALK_FRAME_W, WALK_FRAME_H).data;
+        let low = -1;
+        let onGround = 0;
+        let otherLow = 999;
+        for (let x = 120; x < 400; x++) {
+          let col = -1;
+          for (let y = 639; y >= 480; y--) {
+            if ((data[(y * WALK_FRAME_W + x) * 4 + 3] ?? 0) > 40) {
+              col = y;
+              break;
+            }
+          }
+          if (col < 0) continue;
+          if (col > low) low = col;
+          if (col >= 597) onGround += 1;
+          else if (col < otherLow) otherLow = col;
+        }
+        rows.push({ frame, low, onGround, otherLow: otherLow === 999 ? low : otherLow });
+      }
+      out[dir] = rows;
+    }
+    return out;
   }
 
   private stick(): { x: number; y: number } {
@@ -449,6 +498,20 @@ export class WalkMode {
       this.ctx.restore();
     }
     if (GOAL.x + GOAL.y >= playerDepth) this.drawFlag(scale, ox, oy);
+    this.drawGroundRef(feet.x, feet.y, bodyW);
+  }
+
+  /** Runtime mark at the fixed pivot. The sheet is not shifted onto it. */
+  private drawGroundRef(feetX: number, feetY: number, bodyW: number): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.strokeStyle = "#3a2e24";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(feetX - bodyW * 0.7, feetY + 0.5);
+    ctx.lineTo(feetX + bodyW * 0.7, feetY + 0.5);
+    ctx.stroke();
+    ctx.restore();
   }
 
   private drawWall(c: number, r: number, scale: number, ox: number, oy: number, lift: number): void {

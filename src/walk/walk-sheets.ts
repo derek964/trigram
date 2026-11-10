@@ -16,6 +16,8 @@ export const WALK_FRAMES = 4;
 /** Feet contact inside each frame. */
 export const WALK_ANCHOR_X = 256;
 export const WALK_ANCHOR_Y = 600;
+/** Second delivered strip set. The pivot stays (256, 600); frames are not recentered. */
+export const WALK_BATCH = "v2";
 export const WALK_SHEET_W = WALK_FRAME_W * WALK_FRAMES;
 export const WALK_SHEET_H = WALK_FRAME_H;
 
