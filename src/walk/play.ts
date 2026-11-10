@@ -319,7 +319,7 @@ export class WalkMode {
     const missing = dirs.filter((dir) => !this.sheets[dir]);
     const note = document.getElementById("walk-limit");
     if (note && missing.length === 0) {
-      note.textContent = "v3-fix，不是终稿。四帧内仍会滑，南北落脚没有后移，换向矛的位置不一致，停步仍会收脚。";
+      note.textContent = "v4 四帧，不是终稿。东西没抵消纵向，南北腿交叉，帧内仍滑，换向矛左右不一致。";
     } else if (note && missing.length) {
       note.textContent = `行走帧缺失：${missing.join(" ")}。缺的方向不用单张冒充迈步。`;
     }
@@ -344,7 +344,8 @@ export class WalkMode {
     const standing = poseKind(this.walker.moving, !!this.idles[cardinal]) === "idle";
     const blocked = held.length > 0 && !this.walker.moving && !this.walker.won;
     const motion = this.walker.won ? "到旗立" : blocked ? "受阻立" : standing ? "立" : "走";
-    el.textContent = `${this.buildLabel()} · 输入 ${held.join("") || "无"} · 朝${cardinal} · ${motion}`;
+    const phase = this.walker.phase.toFixed(2);
+    el.textContent = `${this.buildLabel()} · 输入 ${held.join("") || "无"} · 朝${cardinal} · 相位${phase} · ${motion}`;
   }
 
   private buildLabel(): string {
