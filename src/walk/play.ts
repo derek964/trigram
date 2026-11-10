@@ -319,7 +319,7 @@ export class WalkMode {
     const missing = dirs.filter((dir) => !this.sheets[dir]);
     const note = document.getElementById("walk-limit");
     if (note && missing.length === 0) {
-      note.textContent = "第三批，不是终稿。裤缝靴缝还在，站立双脚收拢，换向持矛的手不一致，斗篷仍挡住南北迈步。";
+      note.textContent = "v3-fix，不是终稿。四帧内仍会滑，南北落脚没有后移，换向矛的位置不一致，停步仍会收脚。";
     } else if (note && missing.length) {
       note.textContent = `行走帧缺失：${missing.join(" ")}。缺的方向不用单张冒充迈步。`;
     }

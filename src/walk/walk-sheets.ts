@@ -16,8 +16,8 @@ export const WALK_FRAMES = 4;
 /** Feet contact inside each frame. */
 export const WALK_ANCHOR_X = 256;
 export const WALK_ANCHOR_Y = 600;
-/** Third delivered strip set, with a stand pose per direction. The pivot stays (256, 600). */
-export const WALK_BATCH = "v3";
+/** Targeted v3-fix sheets. The pivot and the distance cycle stay as they were. */
+export const WALK_BATCH = "v3-fix";
 export const WALK_SHEET_W = WALK_FRAME_W * WALK_FRAMES;
 export const WALK_SHEET_H = WALK_FRAME_H;
 
