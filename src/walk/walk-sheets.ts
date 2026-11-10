@@ -16,8 +16,8 @@ export const WALK_FRAMES = 4;
 /** Feet contact inside each frame. */
 export const WALK_ANCHOR_X = 256;
 export const WALK_ANCHOR_Y = 600;
-/** Second delivered strip set. The pivot stays (256, 600); frames are not recentered. */
-export const WALK_BATCH = "v2";
+/** Third delivered strip set, with a stand pose per direction. The pivot stays (256, 600). */
+export const WALK_BATCH = "v3";
 export const WALK_SHEET_W = WALK_FRAME_W * WALK_FRAMES;
 export const WALK_SHEET_H = WALK_FRAME_H;
 
@@ -27,6 +27,23 @@ export const WALK_SHEET_URLS: Record<Cardinal, string> = {
   S: "art/walk/hunter-s.png",
   W: "art/walk/hunter-w.png",
 };
+
+/** One stand pose per facing. Same pivot as the walk cells. Not a second cycle. */
+export const IDLE_URLS: Record<Cardinal, string> = {
+  N: "art/idle/hunter-n-idle.png",
+  E: "art/idle/hunter-e-idle.png",
+  S: "art/idle/hunter-s-idle.png",
+  W: "art/idle/hunter-w-idle.png",
+};
+
+export function idleSizeOk(width: number, height: number): boolean {
+  return width === WALK_FRAME_W && height === WALK_FRAME_H;
+}
+
+/** A valid idle replaces the frozen walk frame on release, a blocked wall, and the flag. */
+export function poseKind(moving: boolean, idleReady: boolean): "walk" | "idle" {
+  return !moving && idleReady ? "idle" : "walk";
+}
 
 const PNG_SIG = [137, 80, 78, 71, 13, 10, 26, 10];
 

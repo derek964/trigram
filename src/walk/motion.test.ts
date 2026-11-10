@@ -6,7 +6,7 @@ import { circleBlocked, createWalker, moveCircle, stepWalker } from "./motion";
 import { HUNTER_URL, FACING_SHEET_COUNT, WALK_FRAME_COUNT } from "./art";
 import { revealRect, shouldCutaway, wallDepth, wallSilhouette, walkerDepth } from "./occlusion";
 import { cardinalFromFacing, facingRead, footPair, gait } from "./paper-hunter";
-import { isRgbaPng, sheetFrame, wallTallerThanHunter } from "./walk-sheets";
+import { idleSizeOk, isRgbaPng, poseKind, sheetFrame, wallTallerThanHunter } from "./walk-sheets";
 
 test("maze branches, has a dead end that is not the flag, and reaches the flag", () => {
   const path = shortestPath();
@@ -149,6 +149,14 @@ test("a held wall stop does not advance the walk phase", () => {
   for (let i = 0; i < 40; i++) w = stepWalker(w, { x: 0, y: -1 }, 1 / 30);
   assert.equal(w.phase, phase);
   assert.equal(sheetFrame(w.phase, false), 0);
+});
+
+test("a stop uses the stand pose only when that idle is loaded", () => {
+  assert.equal(poseKind(true, true), "walk");
+  assert.equal(poseKind(false, true), "idle");
+  assert.equal(poseKind(false, false), "walk");
+  assert.equal(idleSizeOk(512, 640), true);
+  assert.equal(idleSizeOk(2048, 640), false);
 });
 
 test("walls are taller than the hunter body", () => {

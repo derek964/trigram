@@ -15,10 +15,13 @@ import {
   WALK_ANCHOR_Y,
   WALK_FRAME_H,
   WALK_FRAME_W,
+  IDLE_URLS,
   WALK_BATCH,
   WALK_FRAMES,
   WALK_SHEET_URLS,
+  idleSizeOk,
   isRgbaPng,
+  poseKind,
   sheetFrame,
   sheetSizeOk,
 } from "./walk-sheets";
@@ -43,7 +46,7 @@ function loadImage(src: string): Promise<Img | null> {
   });
 }
 
-async function loadRgbaSheet(src: string): Promise<Img | null> {
+async function loadRgbaPng(src: string, sizeOk: (width: number, height: number) => boolean): Promise<Img | null> {
   if (!src.toLowerCase().split("?")[0]!.endsWith(".png")) return null;
   try {
     const res = await fetch(src);
@@ -51,7 +54,7 @@ async function loadRgbaSheet(src: string): Promise<Img | null> {
     const bytes = new Uint8Array(await res.arrayBuffer());
     if (!isRgbaPng(bytes)) return null;
     const img = await loadImage(URL.createObjectURL(new Blob([bytes], { type: "image/png" })));
-    if (!img || !sheetSizeOk(img.naturalWidth, img.naturalHeight)) return null;
+    if (!img || !sizeOk(img.naturalWidth, img.naturalHeight)) return null;
     return img;
   } catch {
     return null;
@@ -127,6 +130,7 @@ export class WalkMode {
   private hunter: Img | null = null;
   private hunterBox: Box | null = null;
   private sheets: Partial<Record<Cardinal, Img>> = {};
+  private idles: Partial<Record<Cardinal, Img>> = {};
   private flag: Img | null = null;
   private paths: Img[] = [];
   private grass: Img[] = [];
@@ -170,6 +174,7 @@ export class WalkMode {
   getState(): Walker & {
     cardinal: Cardinal;
     presentation: "walk-sheet" | "interim-single-pose";
+    pose: "walk" | "idle";
     wallRaise: number;
     bodyScale: number;
     cutaways: number;
@@ -179,6 +184,7 @@ export class WalkMode {
       ...this.walker,
       cardinal,
       presentation: this.sheets[cardinal] ? "walk-sheet" : "interim-single-pose",
+      pose: poseKind(this.walker.moving, !!this.idles[cardinal]),
       wallRaise: WALL_RAISE_SCALE,
       bodyScale: HUNTER_BODY_SCALE,
       cutaways: this.cutaways,
@@ -304,14 +310,16 @@ export class WalkMode {
     const dirs = Object.keys(WALK_SHEET_URLS) as Cardinal[];
     await Promise.all(
       dirs.map(async (dir) => {
-        const img = await loadRgbaSheet(assetUrl(WALK_SHEET_URLS[dir]));
+        const img = await loadRgbaPng(assetUrl(WALK_SHEET_URLS[dir]), sheetSizeOk);
         if (img) this.sheets[dir] = img;
+        const idle = await loadRgbaPng(assetUrl(IDLE_URLS[dir]), idleSizeOk);
+        if (idle) this.idles[dir] = idle;
       }),
     );
     const missing = dirs.filter((dir) => !this.sheets[dir]);
     const note = document.getElementById("walk-limit");
     if (note && missing.length === 0) {
-      note.textContent = "第二批行走帧，不是终稿。斗篷仍挡住南北迈步，东向矛的手和轮廓还要改。";
+      note.textContent = "第三批，不是终稿。裤缝靴缝还在，站立双脚收拢，换向持矛的手不一致，斗篷仍挡住南北迈步。";
     } else if (note && missing.length) {
       note.textContent = `行走帧缺失：${missing.join(" ")}。缺的方向不用单张冒充迈步。`;
     }
@@ -333,10 +341,10 @@ export class WalkMode {
     if (this.held.has("s")) held.push("下");
     if (this.held.has("e")) held.push("右");
     const cardinal = cardinalFromFacing(this.walker.facing);
-    const frame = sheetFrame(this.walker.phase, this.walker.moving, WALK_FRAMES);
+    const standing = poseKind(this.walker.moving, !!this.idles[cardinal]) === "idle";
     const blocked = held.length > 0 && !this.walker.moving && !this.walker.won;
-    const motion = this.walker.won ? "到旗" : blocked ? "受阻停步" : this.walker.moving ? "在走" : "停";
-    el.textContent = `${this.buildLabel()} · 输入 ${held.join("") || "无"} · 朝${cardinal} · 帧${frame} · ${motion}`;
+    const motion = this.walker.won ? "到旗立" : blocked ? "受阻立" : standing ? "立" : "走";
+    el.textContent = `${this.buildLabel()} · 输入 ${held.join("") || "无"} · 朝${cardinal} · ${motion}`;
   }
 
   private buildLabel(): string {
@@ -579,8 +587,24 @@ export class WalkMode {
     ctx.ellipse(feetX, feetY + 2, bodyH * 0.22, bodyH * 0.08, 0, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(70, 48, 28, 0.28)";
     ctx.fill();
+    const px = bodyH / WALK_ANCHOR_Y;
+    const idle = this.idles[cardinal];
+    if (idle && poseKind(this.walker.moving, true) === "idle") {
+      ctx.drawImage(
+        idle,
+        0,
+        0,
+        WALK_FRAME_W,
+        WALK_FRAME_H,
+        feetX - WALK_ANCHOR_X * px,
+        feetY - WALK_ANCHOR_Y * px,
+        WALK_FRAME_W * px,
+        WALK_FRAME_H * px,
+      );
+      ctx.restore();
+      return;
+    }
     if (sheet) {
-      const px = bodyH / WALK_ANCHOR_Y;
       const frame = sheetFrame(this.walker.phase, this.walker.moving, WALK_FRAMES);
       ctx.drawImage(
         sheet,
