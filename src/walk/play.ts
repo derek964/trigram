@@ -551,20 +551,6 @@ export class WalkMode {
       this.ctx.restore();
     }
     if (GOAL.x + GOAL.y >= playerDepth) this.drawFlag(scale, ox, oy);
-    this.drawGroundRef(feet.x, feet.y, bodyW);
-  }
-
-  /** Runtime mark at the fixed pivot. The sheet is not shifted onto it. */
-  private drawGroundRef(feetX: number, feetY: number, bodyW: number): void {
-    const ctx = this.ctx;
-    ctx.save();
-    ctx.strokeStyle = "#3a2e24";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(feetX - bodyW * 0.7, feetY + 0.5);
-    ctx.lineTo(feetX + bodyW * 0.7, feetY + 0.5);
-    ctx.stroke();
-    ctx.restore();
   }
 
   private drawWall(c: number, r: number, scale: number, ox: number, oy: number, lift: number): void {
