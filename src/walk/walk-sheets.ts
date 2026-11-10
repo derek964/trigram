@@ -16,8 +16,8 @@ export const WALK_FRAMES = 4;
 /** Feet contact inside each frame. */
 export const WALK_ANCHOR_X = 256;
 export const WALK_ANCHOR_Y = 600;
-/** V5 four-frame sheets. Pivot unchanged. Cycle distance is owned by motion.ts. */
-export const WALK_BATCH = "v5";
+/** V6 local sheets. Only N1, N2, and S2 differ from V5. Cycle stays 1.024. */
+export const WALK_BATCH = "v6";
 export const WALK_SHEET_W = WALK_FRAME_W * WALK_FRAMES;
 export const WALK_SHEET_H = WALK_FRAME_H;
 

@@ -335,7 +335,7 @@ export class WalkMode {
     const missing = dirs.filter((dir) => !this.sheets[dir]);
     const note = document.getElementById("walk-limit");
     if (note && missing.length === 0) {
-      note.textContent = `v5 周期${WALK_CYCLE_DISTANCE}，不是终稿。采样对齐不是帧内不滑。腰缝和换向矛未解。收脚默认关。`;
+      note.textContent = `v6 只改北1北2靴筒和南2裤靴接缝。周期${WALK_CYCLE_DISTANCE}未改。不是终稿。`;
     } else if (note && missing.length) {
       note.textContent = `行走帧缺失：${missing.join(" ")}。缺的方向不用单张冒充迈步。`;
     }
