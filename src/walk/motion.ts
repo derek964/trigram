@@ -1,8 +1,13 @@
 import { GOAL, GOAL_RADIUS, MAZE_GRID, PLAYER_RADIUS, START, type Grid } from "./maze";
 
 export const MOVE_SPEED = 2.55;
-/** World distance for one four-frame cycle. 1.53 is the previous cycle, not a V5 calibration. */
-export const WALK_CYCLE_DISTANCE = 1.53;
+/**
+ * One four-frame cycle. V5's same-foot step is 64 by 32 art pixels.
+ * At 250 and 125 art pixels per world unit, that step is 0.256 units,
+ * so four samples are 1.024. This matches the sample boundary only.
+ * The foot stays fixed while a frame is held, so that distance still slides.
+ */
+export const WALK_CYCLE_DISTANCE = 1.024;
 export const WALK_PHASE_PER_UNIT = (Math.PI * 2) / WALK_CYCLE_DISTANCE;
 
 export interface Walker {
