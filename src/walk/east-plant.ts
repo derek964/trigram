@@ -29,14 +29,20 @@ export interface ArtPoint {
 export type PlantFoot = 0 | 1;
 export type PlantPoseId =
   | "source0-entry"
+  | "E0-0.110"
   | "E0-mid"
+  | "E0-0.330"
   | "source0-trailing"
   | "source1-entry"
+  | "E1-0.110"
   | "E1-mid"
+  | "E1-0.330"
   | "source1-trailing";
 /** Windows of one 0.440 plant. Not the 1.024 cycle and not the 0.256 plants. */
-export const EAST_ENTRY_END = 0.11;
-export const EAST_MID_END = 0.33;
+export const EAST_ENTRY_END = 0.055;
+export const EAST_110_END = 0.165;
+export const EAST_220_END = 0.275;
+export const EAST_330_END = 0.385;
 
 export interface PlantBoot {
   file: string;
@@ -71,12 +77,28 @@ const POSES: Record<PlantPoseId, PlantPose> = {
       { file: "boot-foot0-entry.png", foot: 0, sole: { x: 314.5, y: 625 }, latched: true, role: "support" },
     ],
   },
+  "E0-0.110": {
+    id: "E0-0.110",
+    trousers: "trousers-E0-0.110.png",
+    boots: [
+      { file: "boot-foot1-E0-0.110-swing.png", foot: 1, sole: { x: 238.5, y: 564 }, latched: false, role: "swing" },
+      { file: "boot-foot0-E0-0.110.png", foot: 0, sole: { x: 286.5, y: 611 }, latched: true, role: "support" },
+    ],
+  },
   "E0-mid": {
     id: "E0-mid",
     trousers: "trousers-E0-mid.png",
     boots: [
       { file: "boot-foot1-E0-mid-swing.png", foot: 1, sole: { x: 271, y: 557 }, latched: false, role: "swing" },
       { file: "boot-foot0-E0-mid.png", foot: 0, sole: { x: 259.5, y: 597 }, latched: true, role: "support" },
+    ],
+  },
+  "E0-0.330": {
+    id: "E0-0.330",
+    trousers: "trousers-E0-0.330.png",
+    boots: [
+      { file: "boot-foot1-E0-0.330-swing.png", foot: 1, sole: { x: 303, y: 550 }, latched: false, role: "swing" },
+      { file: "boot-foot0-E0-0.330.png", foot: 0, sole: { x: 232.5, y: 584 }, latched: true, role: "support" },
     ],
   },
   "source0-trailing": {
@@ -95,12 +117,28 @@ const POSES: Record<PlantPoseId, PlantPose> = {
       { file: "boot-foot1-entry.png", foot: 1, sole: { x: 315.5, y: 625 }, latched: true, role: "support" },
     ],
   },
+  "E1-0.110": {
+    id: "E1-0.110",
+    trousers: "trousers-E1-0.110.png",
+    boots: [
+      { file: "boot-foot0-E1-0.110-swing.png", foot: 0, sole: { x: 237, y: 564 }, latched: false, role: "swing" },
+      { file: "boot-foot1-E1-0.110.png", foot: 1, sole: { x: 288.5, y: 611 }, latched: true, role: "support" },
+    ],
+  },
   "E1-mid": {
     id: "E1-mid",
     trousers: "trousers-E1-mid.png",
     boots: [
       { file: "boot-foot0-E1-mid-swing.png", foot: 0, sole: { x: 270, y: 557 }, latched: false, role: "swing" },
       { file: "boot-foot1-E1-mid.png", foot: 1, sole: { x: 260.5, y: 597 }, latched: true, role: "support" },
+    ],
+  },
+  "E1-0.330": {
+    id: "E1-0.330",
+    trousers: "trousers-E1-0.330.png",
+    boots: [
+      { file: "boot-foot0-E1-0.330-swing.png", foot: 0, sole: { x: 302, y: 550 }, latched: false, role: "swing" },
+      { file: "boot-foot1-E1-0.330.png", foot: 1, sole: { x: 232.5, y: 584 }, latched: true, role: "support" },
     ],
   },
   "source1-trailing": {
@@ -158,23 +196,38 @@ export function billboardBoot(
 }
 
 export function poseFor(foot: PlantFoot, local: number): PlantPose {
-  const phase = local < EAST_ENTRY_END ? "entry" : local < EAST_MID_END ? "mid" : "trail";
-  if (foot === 0) {
-    if (phase === "entry") return POSES["source0-entry"];
-    if (phase === "mid") return POSES["E0-mid"];
-    return POSES["source0-trailing"];
-  }
-  if (phase === "entry") return POSES["source1-entry"];
-  if (phase === "mid") return POSES["E1-mid"];
-  return POSES["source1-trailing"];
+  const id = foot === 0
+    ? local < EAST_ENTRY_END
+      ? "source0-entry"
+      : local < EAST_110_END
+        ? "E0-0.110"
+        : local < EAST_220_END
+          ? "E0-mid"
+          : local < EAST_330_END
+            ? "E0-0.330"
+            : "source0-trailing"
+    : local < EAST_ENTRY_END
+      ? "source1-entry"
+      : local < EAST_110_END
+        ? "E1-0.110"
+        : local < EAST_220_END
+          ? "E1-mid"
+          : local < EAST_330_END
+            ? "E1-0.330"
+            : "source1-trailing";
+  return POSES[id];
 }
 
-/** Mid labels follow the S01 form. Entry and trailing keep 入 / 后. */
+/** New edge poses stay distinct from the 0.220 labels. Entry and trailing keep 入 / 后. */
 export function eastHudToken(foot: PlantFoot, local: number): string {
   const pose = poseFor(foot, local);
   const text = local.toFixed(2);
+  if (pose.id === "E0-0.110") return `E011${text}`;
   if (pose.id === "E0-mid") return `E01${text}`;
+  if (pose.id === "E0-0.330") return `E033${text}`;
+  if (pose.id === "E1-0.110") return `E111${text}`;
   if (pose.id === "E1-mid") return `E1${text}`;
+  if (pose.id === "E1-0.330") return `E133${text}`;
   return `${foot}${pose.id.endsWith("trailing") ? "后" : "入"}${text}`;
 }
 
