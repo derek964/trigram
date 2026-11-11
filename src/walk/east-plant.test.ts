@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { WALK_CYCLE_DISTANCE } from "./motion";
+import { NSW_MEASURED_STEP, WALK_CYCLE_DISTANCE } from "./motion";
 import { WALL_RAISE_SCALE } from "./walk-sheets";
 import {
   ENTRY_SOLE_Y_GAP,
@@ -31,6 +31,8 @@ test("eastline soles are a pure-east plant, not the 1.024 cycle", () => {
   assert.equal(PLANT_DISTANCE, 0.44);
   assert.equal(PLANT_CYCLE, 0.88);
   assert.equal(WALK_CYCLE_DISTANCE, 1.024);
+  assert.equal(NSW_MEASURED_STEP * 4, WALK_CYCLE_DISTANCE);
+  assert.notEqual(NSW_MEASURED_STEP * 4, PLANT_CYCLE);
   assert.equal(WALL_RAISE_SCALE, 1.75);
 });
 

@@ -2,12 +2,14 @@ import { GOAL, GOAL_RADIUS, MAZE_GRID, PLAYER_RADIUS, START, type Grid } from ".
 
 export const MOVE_SPEED = 2.55;
 /**
- * One four-frame cycle. V5's same-foot step is 64 by 32 art pixels.
- * At 250 and 125 art pixels per world unit, that step is 0.256 units,
- * so four samples are 1.024. This matches the sample boundary only.
- * The foot stays fixed while a frame is held, so that distance still slides.
+ * North, south, and west still use the four-frame V6 sheets. Their same-foot
+ * sample step measures 0.256 world, so four samples are 1.024. That number is
+ * the sheet measurement, not the east plant. East plants use 0.440 and do not
+ * read this. The foot stays fixed while a frame is held, so the distance still slides.
  */
 export const WALK_CYCLE_DISTANCE = 1.024;
+/** Measured V6 same-foot step on the north, south, and west sheets. Not 0.440. */
+export const NSW_MEASURED_STEP = 0.256;
 export const WALK_PHASE_PER_UNIT = (Math.PI * 2) / WALK_CYCLE_DISTANCE;
 
 export interface Walker {

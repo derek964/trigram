@@ -3,10 +3,24 @@
  * The picture is public/art/hunter.png until four RGBA walk sheets load.
  * That file is one pose. It is not tilted into a fake step.
  */
-import { FLAG_URL, GRASS_URLS, HUNTER_URL, PATH_URLS } from "./art";
+import { FLAG_URL, GRASS_URLS, HUNTER_URL } from "./art";
 import { GOAL, MAZE_GRID, MAZE_ROWS, START } from "./maze";
 import { WALK_CYCLE_DISTANCE, createWalker, isWall, stepWalker, type Walker } from "./motion";
-import { project, revealRect, shouldCutaway, wallDepth, wallSilhouette, walkerDepth } from "./occlusion";
+import { revealRect, shouldCutaway } from "./occlusion";
+import {
+  TPS_EYE_HEIGHT,
+  TPS_FOV_Y_DEG,
+  TPS_LOOK_AHEAD,
+  TPS_LOOK_HEIGHT,
+  TPS_VIEW_ASPECT,
+  type TpsCamera,
+  cameraBack,
+  distanceTo,
+  fitBillboard,
+  makeTpsCamera,
+  projectGround,
+  projectTps,
+} from "./tps-camera";
 import {
   PLANT_DISTANCE,
   type EastPlant,
@@ -121,6 +135,27 @@ function opaqueBox(img: Img): Box {
   return { sx: 0, sy: 0, sw: img.naturalWidth, sh: img.naturalHeight };
 }
 
+function hull(pts: { x: number; y: number }[]): { x: number; y: number }[] {
+  if (pts.length < 3) return pts;
+  const p = [...pts].sort((a, b) => a.x - b.x || a.y - b.y);
+  const cross = (o: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }) =>
+    (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const lower: { x: number; y: number }[] = [];
+  for (const pt of p) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2]!, lower[lower.length - 1]!, pt) <= 0) lower.pop();
+    lower.push(pt);
+  }
+  const upper: { x: number; y: number }[] = [];
+  for (let i = p.length - 1; i >= 0; i--) {
+    const pt = p[i]!;
+    while (upper.length >= 2 && cross(upper[upper.length - 2]!, upper[upper.length - 1]!, pt) <= 0) upper.pop();
+    upper.push(pt);
+  }
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
+
 function poly(ctx: CanvasRenderingContext2D, pts: { x: number; y: number }[], fill: string): void {
   const a = pts[0];
   if (!a) return;
@@ -167,12 +202,12 @@ export class WalkMode {
   private settleFrom = 0;
   private wasMoving = false;
   private flag: Img | null = null;
-  private paths: Img[] = [];
   private grass: Img[] = [];
   private flagBox: Box | null = null;
   private readySent = false;
   private cutaways = 0;
   private eastPlant: EastPlant | null = null;
+  private frozenWalk: { cardinal: Cardinal; frame: number } | null = null;
   private eastPlates: Record<string, Img> = {};
   private plantLog: PlantSample[] = [];
 
@@ -207,6 +242,7 @@ export class WalkMode {
   restart(): void {
     this.walker = createWalker();
     this.eastPlant = null;
+    this.frozenWalk = null;
     this.plantLog = [];
     this.win.classList.add("hidden");
     this.status.textContent = "沿走廊走到绿旗";
@@ -214,6 +250,12 @@ export class WalkMode {
 
   getPlantLog(): PlantSample[] {
     return this.plantLog;
+  }
+
+  getCamera(): { back: number; eye: number; look: number; ahead: number; fov: number; aspect: number } {
+    const cardinal = cardinalFromFacing(this.walker.facing);
+    const back = cameraBack(this.walker.x, this.walker.y, cardinal, (x, y) => isWall(MAZE_GRID, Math.floor(x), Math.floor(y)));
+    return { back, eye: TPS_EYE_HEIGHT, look: TPS_LOOK_HEIGHT, ahead: TPS_LOOK_AHEAD, fov: TPS_FOV_Y_DEG, aspect: TPS_VIEW_ASPECT };
   }
 
   getState(): Walker & {
@@ -335,16 +377,14 @@ export class WalkMode {
   }
 
   private async loadArt(): Promise<void> {
-    const [hunter, flag, ...rest] = await Promise.all([
+    const [hunter, flag, ...grass] = await Promise.all([
       loadImage(assetUrl(HUNTER_URL)),
       loadImage(assetUrl(FLAG_URL)),
-      ...PATH_URLS.map((p) => loadImage(assetUrl(p))),
       ...GRASS_URLS.map((p) => loadImage(assetUrl(p))),
     ]);
     this.hunter = hunter;
     this.flag = flag;
-    this.paths = rest.slice(0, PATH_URLS.length).filter((img): img is Img => !!img);
-    this.grass = rest.slice(PATH_URLS.length).filter((img): img is Img => !!img);
+    this.grass = grass.filter((img): img is Img => !!img);
     if (hunter) this.hunterBox = opaqueBox(hunter);
     if (flag) this.flagBox = opaqueBox(flag);
     await this.loadSheets();
@@ -416,9 +456,12 @@ export class WalkMode {
     const cardinal = cardinalFromFacing(this.walker.facing);
     const view = this.poseNow();
     const blocked = held.length > 0 && !this.walker.moving && !this.walker.won;
+    const holdingWalk = this.frozenWalk?.cardinal === cardinal && !this.walker.moving && !this.eastPlant;
     const pose = this.eastPlant && !this.walker.moving
       ? "植停"
-      : view.kind === "walk"
+      : holdingWalk
+        ? `停${this.frozenWalk?.frame ?? 0}`
+        : view.kind === "walk"
         ? "走"
         : view.kind === "settle"
           ? `收${view.cell}`
@@ -528,6 +571,9 @@ export class WalkMode {
         this.walker.moving,
         cardinal === "E",
       );
+      if (this.walker.moving && !(cardinal === "E" && this.eastPlant)) {
+        this.frozenWalk = { cardinal, frame: sheetFrame(this.walker.phase, true) };
+      }
       this.trackSettle();
       if (this.walker.won) {
         this.win.classList.remove("hidden");
@@ -560,134 +606,148 @@ export class WalkMode {
     ctx.fillStyle = "#e7d8c4";
     ctx.fillRect(0, 0, w, h);
 
-    const targetBody = Math.min(w, h) * 0.3;
-    const scale = targetBody / HUNTER_BODY_SCALE;
-    const raise = WALL_RAISE_SCALE * scale;
-    const focus = project(this.walker.x, this.walker.y, scale, 0, 0);
-    const ox = w / 2 - focus.x;
-    const oy = h * 0.62 - focus.y;
-    const at = (x: number, y: number) => project(x, y, scale, ox, oy);
-
-    const footprint = [at(0.15, 0.15), at(COLS - 0.15, 0.15), at(COLS - 0.15, ROWS - 0.15), at(0.15, ROWS - 0.15)];
-    const shadow = footprint.map((p) => ({ x: p.x + scale * 0.06, y: p.y + scale * 0.1 }));
-    poly(ctx, shadow, "rgba(92, 64, 38, 0.16)");
-    poly(ctx, footprint, "#e4cba6");
-
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        if (isWall(MAZE_GRID, c, r)) continue;
-        const pad = this.paths[(c * 3 + r) % Math.max(1, this.paths.length)] ?? this.paths[0];
-        const center = at(c + 0.5, r + 0.5);
-        if (pad) {
-          const dw = scale * 1.22;
-          const dh = dw * 0.52;
-          ctx.drawImage(pad, center.x - dw / 2, center.y - dh / 2, dw, dh);
-        }
-        if (this.grass.length && ((c * 5 + r * 9) & 3) === 0 && !(c === START.c && r === START.r) && !(c === GOAL.c && r === GOAL.r)) {
-          const g = this.grass[(c + r) % this.grass.length]!;
-          const gh = scale * 0.42;
-          const gw = gh * (g.naturalWidth / g.naturalHeight);
-          ctx.drawImage(g, center.x - gw / 2, center.y - gh * 0.72, gw, gh);
-        }
-      }
-    }
-
-    const feet = at(this.walker.x, this.walker.y);
-    const bodyH = HUNTER_BODY_SCALE * scale;
+    const cardinal = cardinalFromFacing(this.walker.facing);
+    const back = cameraBack(this.walker.x, this.walker.y, cardinal, (x, y) => isWall(MAZE_GRID, Math.floor(x), Math.floor(y)));
+    const cam = makeTpsCamera(this.walker.x, this.walker.y, cardinal, w, h, back);
+    const feet = projectGround(this.walker.x, this.walker.y, cam);
+    const head = projectTps(this.walker.x, HUNTER_BODY_SCALE, this.walker.y, cam);
+    if (!feet || !head) return;
+    const fitted = fitBillboard(feet, head, cam.view, 8, (WALK_FRAME_H - WALK_ANCHOR_Y) / WALK_ANCHOR_Y);
+    const bodyH = fitted.h;
     const aspect = this.hunterBox ? this.hunterBox.sw / this.hunterBox.sh : 0.63;
     const bodyW = bodyH * aspect;
-    const reveal = revealRect(feet.x, feet.y, bodyW, bodyH, scale * 0.45);
-    const playerDepth = walkerDepth(this.walker.x, this.walker.y);
+    const margin = 8;
+    let feetX = fitted.x;
+    if (feetX - bodyW / 2 < cam.view.x + margin) feetX = cam.view.x + margin + bodyW / 2;
+    if (feetX + bodyW / 2 > cam.view.x + cam.view.w - margin) feetX = cam.view.x + cam.view.w - margin - bodyW / 2;
+    const feetY = fitted.y;
+    const reveal = revealRect(feetX, feetY, bodyW, bodyH, bodyH * 0.18);
+    const playerDepth = -distanceTo(this.walker.x, 0.6, this.walker.y, cam);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(cam.view.x, cam.view.y, cam.view.w, cam.view.h);
+    ctx.clip();
+
+    const floors: { c: number; r: number; depth: number }[] = [];
     const walls: { c: number; r: number; depth: number; cut: boolean }[] = [];
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
-        if (!isWall(MAZE_GRID, c, r)) continue;
-        const depth = wallDepth(c, r);
-        const poly = wallSilhouette(c, r, scale, ox, oy, raise);
-        walls.push({ c, r, depth, cut: shouldCutaway(depth, playerDepth, poly, reveal) });
+        const depth = -distanceTo(c + 0.5, 0.2, r + 0.5, cam);
+        if (!isWall(MAZE_GRID, c, r)) {
+          floors.push({ c, r, depth });
+          continue;
+        }
+        const hull = this.wallHull(c, r, cam);
+        walls.push({ c, r, depth, cut: hull.length >= 3 && shouldCutaway(depth, playerDepth, hull, reveal) });
       }
     }
     this.cutaways = walls.filter((cell) => cell.cut).length;
-    const paint = (cell: { c: number; r: number }) => this.drawWall(cell.c, cell.r, scale, ox, oy, raise);
+    floors.sort((a, b) => a.depth - b.depth);
+    for (const cell of floors) this.drawFloor(cell.c, cell.r, cam);
+    const paint = (cell: { c: number; r: number }) => this.drawWall(cell.c, cell.r, cam);
     const behind = walls.filter((cell) => cell.depth <= playerDepth).sort((a, b) => a.depth - b.depth);
     for (const cell of behind) paint(cell);
-    if (GOAL.x + GOAL.y < playerDepth) this.drawFlag(scale, ox, oy);
-    this.drawHunter(feet.x, feet.y, bodyH, scale, ox, oy);
+    if (-distanceTo(GOAL.x, 0.2, GOAL.y, cam) <= playerDepth) this.drawFlag(cam);
+    this.drawHunter(feetX, feetY, bodyH, cam);
     const front = walls.filter((cell) => cell.depth > playerDepth).sort((a, b) => a.depth - b.depth);
     for (const cell of front) {
       if (!cell.cut) {
         paint(cell);
         continue;
       }
-      // Solid everywhere except the hunter's own screen box.
       this.ctx.save();
       this.ctx.beginPath();
-      this.ctx.rect(0, 0, w, h);
+      this.ctx.rect(cam.view.x, cam.view.y, cam.view.w, cam.view.h);
       this.ctx.rect(reveal.x, reveal.y, reveal.w, reveal.h);
       this.ctx.clip("evenodd");
       paint(cell);
       this.ctx.restore();
     }
-    if (GOAL.x + GOAL.y >= playerDepth) this.drawFlag(scale, ox, oy);
+    if (-distanceTo(GOAL.x, 0.2, GOAL.y, cam) > playerDepth) this.drawFlag(cam);
+    ctx.restore();
   }
 
-  private drawWall(c: number, r: number, scale: number, ox: number, oy: number, lift: number): void {
-    const ctx = this.ctx;
-    const up = (x: number, y: number) => {
-      const p = project(x, y, scale, ox, oy);
-      return { x: p.x, y: p.y - lift };
-    };
-    const sw = project(c, r + 1, scale, ox, oy);
-    const se = project(c + 1, r + 1, scale, ox, oy);
-    const ne = project(c + 1, r, scale, ox, oy);
-    const nw = project(c, r, scale, ox, oy);
-    const variant = (c * 7 + r * 3) & 3;
-    const left = ["#b4895e", "#a67c50", "#c19766", "#9a7048"][variant]!;
-    const right = ["#8d6844", "#7a5738", "#9a734c", "#6e4c32"][variant]!;
-    const top = ["#e0c49a", "#d7b88a", "#edd0a6", "#c9a56e"][variant]!;
-    ctx.beginPath();
-    ctx.ellipse(se.x + 2, se.y + scale * 0.06, scale * 0.34, scale * 0.14, 0, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(80, 52, 30, 0.18)";
-    ctx.fill();
-    poly(ctx, [sw, se, up(c + 1, r + 1), up(c, r + 1)], left);
-    poly(ctx, [se, ne, up(c + 1, r), up(c + 1, r + 1)], right);
-    poly(ctx, [up(c, r), up(c + 1, r), up(c + 1, r + 1), up(c, r + 1)], top);
-    ctx.beginPath();
-    ctx.moveTo(up(c, r).x, up(c, r).y);
-    ctx.lineTo(up(c + 1, r).x, up(c + 1, r).y);
-    ctx.lineTo(up(c + 1, r + 1).x, up(c + 1, r + 1).y);
-    ctx.lineTo(up(c, r + 1).x, up(c, r + 1).y);
-    ctx.closePath();
-    ctx.strokeStyle = "rgba(92, 62, 36, 0.45)";
-    ctx.lineWidth = Math.max(1, scale * 0.015);
-    ctx.stroke();
-    if (this.grass.length && ((c * 11 + r * 5) & 3) === 0) {
-      const g = this.grass[(c * 2 + r) % this.grass.length]!;
-      const topC = up(c + 0.5, r + 0.35);
-      const gh = scale * 0.28;
-      const gw = gh * (g.naturalWidth / g.naturalHeight);
-      ctx.drawImage(g, topC.x - gw / 2, topC.y - gh * 0.8, gw, gh);
+  private wallHull(c: number, r: number, cam: TpsCamera): { x: number; y: number }[] {
+    const pts: { x: number; y: number }[] = [];
+    for (const east of [c, c + 1]) {
+      for (const south of [r, r + 1]) {
+        for (const up of [0, WALL_RAISE_SCALE]) {
+          const p = projectTps(east, up, south, cam);
+          if (p) pts.push(p);
+        }
+      }
     }
-    void nw;
+    return hull(pts);
   }
 
-  private drawFlag(scale: number, ox: number, oy: number): void {
+  private drawFloor(c: number, r: number, cam: TpsCamera): void {
+    const shade = (c + r) % 2 === 0 ? "#e4cba6" : "#dcc29a";
+    this.quad(cam, [
+      { e: c, u: 0, s: r },
+      { e: c + 1, u: 0, s: r },
+      { e: c + 1, u: 0, s: r + 1 },
+      { e: c, u: 0, s: r + 1 },
+    ], shade);
+    if (!this.grass.length || ((c * 5 + r * 9) & 3) !== 0 || (c === START.c && r === START.r) || (c === GOAL.c && r === GOAL.r)) return;
+    const g = this.grass[(c + r) % this.grass.length];
+    const at = projectGround(c + 0.5, r + 0.72, cam);
+    if (!g || !at) return;
+    const gh = 18;
+    const gw = gh * (g.naturalWidth / g.naturalHeight);
+    this.ctx.drawImage(g, at.x - gw / 2, at.y - gh, gw, gh);
+  }
+
+  private quad(cam: TpsCamera, corners: { e: number; u: number; s: number }[], color: string): void {
+    const pts = corners.map((p) => projectTps(p.e, p.u, p.s, cam));
+    if (pts.some((p) => !p)) return;
+    poly(this.ctx, pts as { x: number; y: number }[], color);
+  }
+
+  private drawWall(c: number, r: number, cam: TpsCamera): void {
+    const topH = WALL_RAISE_SCALE;
+    const variant = (c * 7 + r * 3) & 3;
+    const warm = ["#b4895e", "#a67c50", "#c19766", "#9a7048"][variant]!;
+    const cool = ["#8d6844", "#7a5738", "#9a734c", "#6e4c32"][variant]!;
+    const cap = ["#e0c49a", "#d7b88a", "#edd0a6", "#c9a56e"][variant]!;
+    const x0 = c;
+    const x1 = c + 1;
+    const z0 = r;
+    const z1 = r + 1;
+    const faces: { n: { x: number; y: number; z: number }; color: string; pts: { e: number; u: number; s: number }[] }[] = [
+      { n: { x: 0, y: 0, z: -1 }, color: warm, pts: [{ e: x0, u: 0, s: z0 }, { e: x1, u: 0, s: z0 }, { e: x1, u: topH, s: z0 }, { e: x0, u: topH, s: z0 }] },
+      { n: { x: 0, y: 0, z: 1 }, color: cool, pts: [{ e: x1, u: 0, s: z1 }, { e: x0, u: 0, s: z1 }, { e: x0, u: topH, s: z1 }, { e: x1, u: topH, s: z1 }] },
+      { n: { x: -1, y: 0, z: 0 }, color: warm, pts: [{ e: x0, u: 0, s: z1 }, { e: x0, u: 0, s: z0 }, { e: x0, u: topH, s: z0 }, { e: x0, u: topH, s: z1 }] },
+      { n: { x: 1, y: 0, z: 0 }, color: cool, pts: [{ e: x1, u: 0, s: z0 }, { e: x1, u: 0, s: z1 }, { e: x1, u: topH, s: z1 }, { e: x1, u: topH, s: z0 }] },
+      { n: { x: 0, y: 1, z: 0 }, color: cap, pts: [{ e: x0, u: topH, s: z0 }, { e: x1, u: topH, s: z0 }, { e: x1, u: topH, s: z1 }, { e: x0, u: topH, s: z1 }] },
+    ];
+    for (const face of faces) {
+      const mid = face.pts.reduce((a, p) => ({ x: a.x + p.e / 4, y: a.y + p.u / 4, z: a.z + p.s / 4 }), { x: 0, y: 0, z: 0 });
+      const toward = { x: mid.x - cam.eye.x, y: mid.y - cam.eye.y, z: mid.z - cam.eye.z };
+      if (toward.x * face.n.x + toward.y * face.n.y + toward.z * face.n.z >= 0) continue;
+      this.quad(cam, face.pts, face.color);
+    }
+  }
+
+  private drawFlag(cam: TpsCamera): void {
     const ctx = this.ctx;
-    const p = project(GOAL.x + 0.08, GOAL.y - 0.02, scale, ox, oy);
+    const p = projectGround(GOAL.x + 0.08, GOAL.y - 0.02, cam);
+    const top = projectTps(GOAL.x + 0.08, 1.2, GOAL.y - 0.02, cam);
+    if (!p || !top) return;
     const img = this.flag;
     const box = this.flagBox;
+    const fh = Math.abs(p.y - top.y) * 1.15;
     if (!img || !box) {
       ctx.fillStyle = "#6e8a62";
-      ctx.fillRect(p.x, p.y - scale * 0.8, 3, scale * 0.8);
+      ctx.fillRect(p.x, p.y - fh, 3, fh);
       return;
     }
-    const fh = scale * 1.45;
     const fw = fh * (box.sw / box.sh);
     ctx.drawImage(img, box.sx, box.sy, box.sw, box.sh, p.x - fw * 0.28, p.y - fh, fw, fh);
   }
 
   /** Upright blit. No tilt and no hop. East plants use layer plates; other facings use the walk sheet. */
-  private drawHunter(feetX: number, feetY: number, bodyH: number, scale: number, ox: number, oy: number): void {
+  private drawHunter(feetX: number, feetY: number, bodyH: number, cam: TpsCamera): void {
     const ctx = this.ctx;
     const cardinal = cardinalFromFacing(this.walker.facing);
     const sheet = this.sheets[cardinal];
@@ -698,7 +758,7 @@ export class WalkMode {
     ctx.fill();
     const px = bodyH / WALK_ANCHOR_Y;
     if (this.eastPlant && this.eastPlatesReady() && cardinal === "E") {
-      this.drawEastPlant(feetX, feetY, px, scale, ox, oy);
+      this.drawEastPlant(feetX, feetY, px, cam);
       ctx.restore();
       return;
     }
@@ -708,6 +768,22 @@ export class WalkMode {
       ctx.drawImage(
         settle,
         view.cell * WALK_FRAME_W,
+        0,
+        WALK_FRAME_W,
+        WALK_FRAME_H,
+        feetX - WALK_ANCHOR_X * px,
+        feetY - WALK_ANCHOR_Y * px,
+        WALK_FRAME_W * px,
+        WALK_FRAME_H * px,
+      );
+      ctx.restore();
+      return;
+    }
+    if (!this.walker.moving && this.frozenWalk?.cardinal === cardinal && sheet) {
+      const frame = this.frozenWalk.frame;
+      ctx.drawImage(
+        sheet,
+        frame * WALK_FRAME_W,
         0,
         WALK_FRAME_W,
         WALK_FRAME_H,
@@ -777,14 +853,7 @@ export class WalkMode {
   }
 
   /** Shaft, trousers, and upper follow the root. Planted boots follow the latch. */
-  private drawEastPlant(
-    feetX: number,
-    feetY: number,
-    px: number,
-    scale: number,
-    ox: number,
-    oy: number,
-  ): void {
+  private drawEastPlant(feetX: number, feetY: number, px: number, cam: TpsCamera): void {
     const plant = this.eastPlant;
     if (!plant) return;
     const pose = poseFor(plant.foot, plant.local);
@@ -806,9 +875,9 @@ export class WalkMode {
     for (const boot of pose.boots) {
       const img = this.eastPlates[boot.file];
       if (!img) return;
-      const screen = this.bootScreen(boot, origin, feetX, feetY, px, scale, ox, oy);
+      const screen = this.bootScreen(boot, origin, feetX, feetY, px, cam);
       this.ctx.drawImage(img, screen.drawX, screen.drawY, WALK_FRAME_W * px, WALK_FRAME_H * px);
-      this.noteSole(pose.id, boot, screen, scale);
+      this.noteSole(pose.id, boot, screen, (px * WALK_ANCHOR_Y) / HUNTER_BODY_SCALE);
     }
     atRoot(trousers);
     atRoot(upper);
@@ -820,9 +889,7 @@ export class WalkMode {
     feetX: number,
     feetY: number,
     px: number,
-    scale: number,
-    ox: number,
-    oy: number,
+    cam: TpsCamera,
   ): {
     drawX: number;
     drawY: number;
@@ -839,7 +906,8 @@ export class WalkMode {
       return { drawX: rootDrawX, drawY: rootDrawY, sole: rootSole, latch: null, latchWorld: null, rootSole };
     }
     const world = latchWorld(origin, plantFoot, boot.role);
-    const latch = project(world.x, world.y, scale, ox, oy);
+    const latch = projectGround(world.x, world.y, cam);
+    if (!latch) return { drawX: rootDrawX, drawY: rootDrawY, sole: rootSole, latch: null, latchWorld: world, rootSole };
     return {
       drawX: latch.x - boot.sole.x * px,
       drawY: latch.y - boot.sole.y * px,
