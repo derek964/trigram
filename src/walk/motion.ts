@@ -27,6 +27,11 @@ export function samplePlantLocal(local: number, distance: number): boolean {
   if (Math.abs(local - NSW_ENTRY_END) < 0.02) return true;
   if (Math.abs(local - 0.128) < 0.02) return true;
   if (Math.abs(local - NSW_MID_END) < 0.02) return true;
+  if (distance > 0.4 && distance < 0.5) {
+    if (Math.abs(local - 0.22) < 0.02) return true;
+    if (Math.abs(local - 0.11) < 0.02) return true;
+    if (Math.abs(local - 0.33) < 0.02) return true;
+  }
   return false;
 }
 export const WALK_PHASE_PER_UNIT = (Math.PI * 2) / WALK_CYCLE_DISTANCE;

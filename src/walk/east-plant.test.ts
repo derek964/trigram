@@ -11,6 +11,7 @@ import {
   artToWorld,
   billboardBoot,
   latchWorld,
+  eastHudToken,
   poseFor,
   stepEastPlant,
   worldToArt,
@@ -61,6 +62,23 @@ test("a pure-east root keeps the support sole on one world latch", () => {
   const done = stepEastPlant(stepped, { x: origin.x + 0.2, y: origin.y }, moved, true, true);
   assert.equal(done?.foot, 1);
   assert.ok(Math.abs(done?.local ?? 1) < 1e-9);
+});
+
+test("east mid-hold is the half of the 0.440 plant, not the 0.256 window", () => {
+  assert.equal(poseFor(0, 0.05).id, "source0-entry");
+  assert.equal(poseFor(0, 0.22).id, "E0-mid");
+  assert.equal(poseFor(0, 0.4).id, "source0-trailing");
+  assert.equal(poseFor(1, 0.22).id, "E1-mid");
+  assert.equal(eastHudToken(0, 0.22), "E010.22");
+  assert.equal(eastHudToken(1, 0.22), "E10.22");
+  const origin = { x: 3, y: 1.5 };
+  const latch = latchWorld(origin, 0, "support");
+  const root = { x: origin.x + 0.22, y: origin.y };
+  const sole = poseFor(0, 0.22).boots.find((boot) => boot.role === "support")!;
+  const art = worldToArt({ x: latch.x - root.x, y: latch.y - root.y });
+  assert.ok(Math.hypot(art.x - sole.sole.x, art.y - sole.sole.y) < 1);
+  assert.equal(sole.sole.y, 597);
+  assert.equal(poseFor(0, 0.22).boots.find((boot) => boot.role === "swing")?.latched, false);
 });
 
 test("a stop freezes the plant and a diagonal or turn drops it", () => {

@@ -27,7 +27,16 @@ export interface ArtPoint {
 }
 
 export type PlantFoot = 0 | 1;
-export type PlantPoseId = "source0-entry" | "source0-trailing" | "source1-entry" | "source1-trailing";
+export type PlantPoseId =
+  | "source0-entry"
+  | "E0-mid"
+  | "source0-trailing"
+  | "source1-entry"
+  | "E1-mid"
+  | "source1-trailing";
+/** Windows of one 0.440 plant. Not the 1.024 cycle and not the 0.256 plants. */
+export const EAST_ENTRY_END = 0.11;
+export const EAST_MID_END = 0.33;
 
 export interface PlantBoot {
   file: string;
@@ -62,6 +71,14 @@ const POSES: Record<PlantPoseId, PlantPose> = {
       { file: "boot-foot0-entry.png", foot: 0, sole: { x: 314.5, y: 625 }, latched: true, role: "support" },
     ],
   },
+  "E0-mid": {
+    id: "E0-mid",
+    trousers: "trousers-E0-mid.png",
+    boots: [
+      { file: "boot-foot1-E0-mid-swing.png", foot: 1, sole: { x: 271, y: 557 }, latched: false, role: "swing" },
+      { file: "boot-foot0-E0-mid.png", foot: 0, sole: { x: 259.5, y: 597 }, latched: true, role: "support" },
+    ],
+  },
   "source0-trailing": {
     id: "source0-trailing",
     trousers: "east-source0-trailing-trousers.png",
@@ -76,6 +93,14 @@ const POSES: Record<PlantPoseId, PlantPose> = {
     boots: [
       { file: "boot-foot0-trailing.png", foot: 0, sole: { x: 204.5, y: 570 }, latched: true, role: "outgoing" },
       { file: "boot-foot1-entry.png", foot: 1, sole: { x: 315.5, y: 625 }, latched: true, role: "support" },
+    ],
+  },
+  "E1-mid": {
+    id: "E1-mid",
+    trousers: "trousers-E1-mid.png",
+    boots: [
+      { file: "boot-foot0-E1-mid-swing.png", foot: 0, sole: { x: 270, y: 557 }, latched: false, role: "swing" },
+      { file: "boot-foot1-E1-mid.png", foot: 1, sole: { x: 260.5, y: 597 }, latched: true, role: "support" },
     ],
   },
   "source1-trailing": {
@@ -133,9 +158,24 @@ export function billboardBoot(
 }
 
 export function poseFor(foot: PlantFoot, local: number): PlantPose {
-  const trailing = local >= PLANT_DISTANCE * 0.5;
-  if (foot === 0) return trailing ? POSES["source0-trailing"] : POSES["source0-entry"];
-  return trailing ? POSES["source1-trailing"] : POSES["source1-entry"];
+  const phase = local < EAST_ENTRY_END ? "entry" : local < EAST_MID_END ? "mid" : "trail";
+  if (foot === 0) {
+    if (phase === "entry") return POSES["source0-entry"];
+    if (phase === "mid") return POSES["E0-mid"];
+    return POSES["source0-trailing"];
+  }
+  if (phase === "entry") return POSES["source1-entry"];
+  if (phase === "mid") return POSES["E1-mid"];
+  return POSES["source1-trailing"];
+}
+
+/** Mid labels follow the S01 form. Entry and trailing keep 入 / 后. */
+export function eastHudToken(foot: PlantFoot, local: number): string {
+  const pose = poseFor(foot, local);
+  const text = local.toFixed(2);
+  if (pose.id === "E0-mid") return `E01${text}`;
+  if (pose.id === "E1-mid") return `E1${text}`;
+  return `${foot}${pose.id.endsWith("trailing") ? "后" : "入"}${text}`;
 }
 
 /** World point of a planted sole. Support uses the entry contact; outgoing uses the entry lock. */
