@@ -9,9 +9,11 @@ import {
   PLANT_CYCLE,
   PLANT_DISTANCE,
   artToWorld,
+  billboardBoot,
   latchWorld,
   poseFor,
   stepEastPlant,
+  worldToArt,
 } from "./east-plant";
 
 test("eastline soles are a pure-east plant, not the 1.024 cycle", () => {
@@ -66,4 +68,18 @@ test("a stop freezes the plant and a diagonal or turn drops it", () => {
   assert.equal(stepEastPlant(plant, { x: 1.1, y: 2 }, { x: 1.1, y: 2 }, false, true), plant);
   assert.equal(stepEastPlant(plant, { x: 1.1, y: 2 }, { x: 1.2, y: 2.05 }, true, true), null);
   assert.equal(stepEastPlant(plant, { x: 1.1, y: 2 }, { x: 1.1, y: 2.2 }, true, false), null);
+});
+
+test("world art round trip, and a matching latch draws the boot on the root plate", () => {
+  const sole = { x: 193.5, y: 601 };
+  const back = worldToArt(artToWorld(sole));
+  assert.ok(Math.abs(back.x - sole.x) < 1e-9);
+  assert.ok(Math.abs(back.y - sole.y) < 1e-9);
+  const root = { x: 1.5, y: 3.2 };
+  const latch = { x: root.x + artToWorld(sole).x, y: root.y + artToWorld(sole).y };
+  const placed = billboardBoot(root, latch, sole, 400, 500, 0.4);
+  assert.ok(Math.abs(placed.drawX - (400 - 256 * 0.4)) < 1e-9);
+  assert.ok(Math.abs(placed.drawY - (500 - 600 * 0.4)) < 1e-9);
+  assert.ok(Math.abs(placed.sole.x - placed.rootSole.x) < 1e-9);
+  assert.ok(Math.abs(placed.sole.y - placed.rootSole.y) < 1e-9);
 });

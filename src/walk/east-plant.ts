@@ -94,6 +94,44 @@ export function artToWorld(art: ArtPoint): WorldPoint {
   return { x: dx / 500 + dy / 250, y: -dx / 500 + dy / 250 };
 }
 
+/** Inverse of artToWorld. (dx, dy) is a world offset from the current root. */
+export function worldToArt(offset: WorldPoint): ArtPoint {
+  return {
+    x: PLANT_PIVOT_X + (offset.x - offset.y) * 250,
+    y: PLANT_PIVOT_Y + (offset.x + offset.y) * 125,
+  };
+}
+
+/**
+ * Place a boot in the same billboard as the body. The world latch is kept.
+ * Screen position is not a perspective projection of the floor point.
+ * When the latch is the current root plus artToWorld(sole), the plate stays put.
+ */
+export function billboardBoot(
+  root: WorldPoint,
+  latch: WorldPoint | null,
+  sole: ArtPoint,
+  feetX: number,
+  feetY: number,
+  px: number,
+): {
+  drawX: number;
+  drawY: number;
+  sole: { x: number; y: number };
+  latch: { x: number; y: number } | null;
+  rootSole: { x: number; y: number };
+} {
+  const originX = feetX - PLANT_PIVOT_X * px;
+  const originY = feetY - PLANT_PIVOT_Y * px;
+  const rootSole = { x: originX + sole.x * px, y: originY + sole.y * px };
+  if (!latch) return { drawX: originX, drawY: originY, sole: rootSole, latch: null, rootSole };
+  const art = worldToArt({ x: latch.x - root.x, y: latch.y - root.y });
+  const drawX = originX + (art.x - sole.x) * px;
+  const drawY = originY + (art.y - sole.y) * px;
+  const latchScreen = { x: drawX + sole.x * px, y: drawY + sole.y * px };
+  return { drawX, drawY, sole: latchScreen, latch: latchScreen, rootSole };
+}
+
 export function poseFor(foot: PlantFoot, local: number): PlantPose {
   const trailing = local >= PLANT_DISTANCE * 0.5;
   if (foot === 0) return trailing ? POSES["source0-trailing"] : POSES["source0-entry"];

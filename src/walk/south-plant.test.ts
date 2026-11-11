@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { PLANT_DISTANCE, artToWorld } from "./east-plant";
+import { PLANT_DISTANCE, artToWorld, worldToArt } from "./east-plant";
 import { NSW_MEASURED_STEP, WALK_CYCLE_DISTANCE } from "./motion";
 import {
   SOUTH_PLANT_DISTANCE,
@@ -90,4 +90,22 @@ test("south plates draw boots, cuff, upper, response, then the front spear", () 
     southLayers(stand).map((layer) => (layer.kind === "root" ? layer.role : layer.boot.role)),
     ["stand", "stand", "trousers", "upper", "spear"],
   );
+});
+
+test("a south latch shifts the boot in billboard art, not by a floor projection", () => {
+  const origin = { x: 1.5, y: 2.524 };
+  const latch = southLatch(origin, 0);
+  const gap = (local: number) => {
+    const root = { x: origin.x, y: origin.y + local };
+    const sole = southPose(0, local).boots.find((boot) => boot.role === "support")!;
+    const art = worldToArt({ x: latch.x - root.x, y: latch.y - root.y });
+    return { dx: art.x - sole.sole.x, dy: art.y - sole.sole.y };
+  };
+  const mid = gap(0.128);
+  assert.ok(Math.abs(Math.hypot(mid.dx, mid.dy) - 35.78) < 0.05);
+  const late = gap(0.24);
+  assert.ok(Math.abs(Math.hypot(late.dx, late.dy) - 4.47) < 0.05);
+  const measured = gap(0.2184);
+  assert.ok(Math.abs(measured.dx - -9.4) < 0.15);
+  assert.ok(Math.abs(measured.dy - 4.7) < 0.15);
 });

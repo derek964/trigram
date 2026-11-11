@@ -25,6 +25,7 @@ import {
   PLANT_DISTANCE,
   type EastPlant,
   type PlantBoot,
+  billboardBoot,
   latchWorld,
   poseFor,
   stepEastPlant,
@@ -98,11 +99,12 @@ interface PlantSample {
   drawn: { x: number; y: number };
   latchWorld: { x: number; y: number } | null;
   latchScreen: { x: number; y: number } | null;
-  /** Drawn sole against that frame's latch projection. Latched boots should be ~0. */
+  /** Drawn sole against the billboard latch. A latched boot should be ~0. */
   deltaPx: number | null;
   /** Where this plate's sole would sit if the whole cell stayed on the root. */
   rootSole: { x: number; y: number };
   rootDeltaPx: number | null;
+  hud: string;
 }
 
 const COLS = MAZE_ROWS[0]!.length;
@@ -819,7 +821,7 @@ export class WalkMode {
     const behind = walls.filter((cell) => cell.depth <= playerDepth).sort((a, b) => a.depth - b.depth);
     for (const cell of behind) paint(cell);
     if (-distanceTo(GOAL.x, 0.2, GOAL.y, cam) <= playerDepth) this.drawFlag(cam);
-    this.drawHunter(feetX, feetY, bodyH, cam);
+    this.drawHunter(feetX, feetY, bodyH);
     const front = walls.filter((cell) => cell.depth > playerDepth).sort((a, b) => a.depth - b.depth);
     for (const cell of front) {
       if (!cell.cut) {
@@ -917,7 +919,7 @@ export class WalkMode {
   }
 
   /** Upright blit. No tilt and no hop. East, north, south, and west plants use layer plates. */
-  private drawHunter(feetX: number, feetY: number, bodyH: number, cam: TpsCamera): void {
+  private drawHunter(feetX: number, feetY: number, bodyH: number): void {
     const ctx = this.ctx;
     const cardinal = cardinalFromFacing(this.walker.facing);
     const sheet = this.sheets[cardinal];
@@ -928,42 +930,42 @@ export class WalkMode {
     ctx.fill();
     const px = bodyH / WALK_ANCHOR_Y;
     if (this.eastPlant && this.eastPlatesReady() && cardinal === "E") {
-      this.drawEastPlant(feetX, feetY, px, cam);
+      this.drawEastPlant(feetX, feetY, px);
       ctx.restore();
       return;
     }
     if (cardinal === "N" && this.northPlatesReady()) {
       if (this.northPlant) {
-        this.drawNorthPlant(feetX, feetY, px, cam, northPose(this.northPlant.foot, this.northPlant.local));
+        this.drawNorthPlant(feetX, feetY, px, northPose(this.northPlant.foot, this.northPlant.local));
         ctx.restore();
         return;
       }
       if (!this.walker.moving && this.frozenWalk?.cardinal !== "N") {
-        this.drawNorthPlant(feetX, feetY, px, cam, northIdlePose());
+        this.drawNorthPlant(feetX, feetY, px, northIdlePose());
         ctx.restore();
         return;
       }
     }
     if (cardinal === "S" && this.southPlatesReady()) {
       if (this.southPlant) {
-        this.drawSouthPlant(feetX, feetY, px, cam, southPose(this.southPlant.foot, this.southPlant.local));
+        this.drawSouthPlant(feetX, feetY, px, southPose(this.southPlant.foot, this.southPlant.local));
         ctx.restore();
         return;
       }
       if (!this.walker.moving && this.frozenWalk?.cardinal !== "S") {
-        this.drawSouthPlant(feetX, feetY, px, cam, southIdlePose());
+        this.drawSouthPlant(feetX, feetY, px, southIdlePose());
         ctx.restore();
         return;
       }
     }
     if (cardinal === "W" && this.westPlatesReady()) {
       if (this.westPlant) {
-        this.drawWestPlant(feetX, feetY, px, cam, westPose(this.westPlant.foot, this.westPlant.local));
+        this.drawWestPlant(feetX, feetY, px, westPose(this.westPlant.foot, this.westPlant.local));
         ctx.restore();
         return;
       }
       if (!this.walker.moving && this.frozenWalk?.cardinal !== "W") {
-        this.drawWestPlant(feetX, feetY, px, cam, westIdlePose());
+        this.drawWestPlant(feetX, feetY, px, westIdlePose());
         ctx.restore();
         return;
       }
@@ -1058,8 +1060,8 @@ export class WalkMode {
     );
   }
 
-  /** Shaft, trousers, and upper follow the root. Planted boots follow the latch. */
-  private drawEastPlant(feetX: number, feetY: number, px: number, cam: TpsCamera): void {
+  /** Shaft, trousers, and upper follow the root. Planted boots follow the billboard latch. */
+  private drawEastPlant(feetX: number, feetY: number, px: number): void {
     const plant = this.eastPlant;
     if (!plant) return;
     const pose = poseFor(plant.foot, plant.local);
@@ -1081,9 +1083,9 @@ export class WalkMode {
     for (const boot of pose.boots) {
       const img = this.eastPlates[boot.file];
       if (!img) return;
-      const screen = this.bootScreen(boot, origin, feetX, feetY, px, cam);
+      const screen = this.bootScreen(boot, origin, feetX, feetY, px);
       this.ctx.drawImage(img, screen.drawX, screen.drawY, WALK_FRAME_W * px, WALK_FRAME_H * px);
-      this.noteSole(pose.id, boot, screen, (px * WALK_ANCHOR_Y) / HUNTER_BODY_SCALE);
+      this.noteSole(pose.id, boot, screen, px);
     }
     atRoot(trousers);
     atRoot(upper);
@@ -1098,7 +1100,6 @@ export class WalkMode {
     feetX: number,
     feetY: number,
     px: number,
-    cam: TpsCamera,
     pose: ReturnType<typeof northPose>,
   ): void {
     const spear = this.northPlates[pose.spear];
@@ -1120,9 +1121,9 @@ export class WalkMode {
     for (const boot of pose.boots) {
       const img = this.northPlates[boot.file];
       if (!img) return;
-      const screen = this.northBootScreen(boot, origin, feetX, feetY, px, cam);
+      const screen = this.northBootScreen(boot, origin, feetX, feetY, px);
       this.ctx.drawImage(img, screen.drawX, screen.drawY, WALK_FRAME_W * px, WALK_FRAME_H * px);
-      this.noteNorthSole(pose.id, boot, screen, (px * WALK_ANCHOR_Y) / HUNTER_BODY_SCALE);
+      this.noteNorthSole(pose.id, boot, screen, px);
     }
     atRoot(trousers);
     atRoot(upper);
@@ -1138,7 +1139,6 @@ export class WalkMode {
     feetX: number,
     feetY: number,
     px: number,
-    cam: TpsCamera,
   ): {
     drawX: number;
     drawY: number;
@@ -1147,23 +1147,9 @@ export class WalkMode {
     latchWorld: { x: number; y: number } | null;
     rootSole: { x: number; y: number };
   } {
-    const rootDrawX = feetX - WALK_ANCHOR_X * px;
-    const rootDrawY = feetY - WALK_ANCHOR_Y * px;
-    const rootSole = { x: rootDrawX + boot.sole.x * px, y: rootDrawY + boot.sole.y * px };
-    if (!boot.latched || !this.northPlant) {
-      return { drawX: rootDrawX, drawY: rootDrawY, sole: rootSole, latch: null, latchWorld: null, rootSole };
-    }
-    const world = northLatch(origin, this.northPlant.foot);
-    const latch = projectGround(world.x, world.y, cam);
-    if (!latch) return { drawX: rootDrawX, drawY: rootDrawY, sole: rootSole, latch: null, latchWorld: world, rootSole };
-    return {
-      drawX: latch.x - boot.sole.x * px,
-      drawY: latch.y - boot.sole.y * px,
-      sole: latch,
-      latch,
-      latchWorld: world,
-      rootSole,
-    };
+    const world = boot.latched && this.northPlant ? northLatch(origin, this.northPlant.foot) : null;
+    const placed = billboardBoot({ x: this.walker.x, y: this.walker.y }, world, boot.sole, feetX, feetY, px);
+    return { ...placed, latchWorld: world };
   }
 
   private noteNorthSole(
@@ -1202,6 +1188,7 @@ export class WalkMode {
       deltaPx: delta,
       rootSole: screen.rootSole,
       rootDeltaPx: rootDelta,
+      hud: document.getElementById("walk-input")?.textContent ?? "",
     });
   }
 
@@ -1216,13 +1203,7 @@ export class WalkMode {
   }
 
   /** Boots, cuff, cleared upper on S1/S3, response, then the front spear. No rear shaft. */
-  private drawSouthPlant(
-    feetX: number,
-    feetY: number,
-    px: number,
-    cam: TpsCamera,
-    pose: SouthPose,
-  ): void {
+  private drawSouthPlant(feetX: number, feetY: number, px: number, pose: SouthPose): void {
     const layers = southLayers(pose);
     const plant = this.southPlant;
     const origin = plant ? { x: plant.originX, y: plant.originY } : { x: this.walker.x, y: this.walker.y };
@@ -1230,9 +1211,9 @@ export class WalkMode {
       if (layer.kind === "boot") {
         const img = this.southPlates[layer.boot.file];
         if (!img) return;
-        const screen = this.southBootScreen(layer.boot, origin, feetX, feetY, px, cam);
+        const screen = this.southBootScreen(layer.boot, origin, feetX, feetY, px);
         this.ctx.drawImage(img, screen.drawX, screen.drawY, WALK_FRAME_W * px, WALK_FRAME_H * px);
-        this.noteSouthSole(pose.id, layer.boot, screen, (px * WALK_ANCHOR_Y) / HUNTER_BODY_SCALE);
+        this.noteSouthSole(pose.id, layer.boot, screen, px);
         continue;
       }
       const img = this.southPlates[layer.file];
@@ -1253,7 +1234,6 @@ export class WalkMode {
     feetX: number,
     feetY: number,
     px: number,
-    cam: TpsCamera,
   ): {
     drawX: number;
     drawY: number;
@@ -1262,23 +1242,9 @@ export class WalkMode {
     latchWorld: { x: number; y: number } | null;
     rootSole: { x: number; y: number };
   } {
-    const rootDrawX = feetX - WALK_ANCHOR_X * px;
-    const rootDrawY = feetY - WALK_ANCHOR_Y * px;
-    const rootSole = { x: rootDrawX + boot.sole.x * px, y: rootDrawY + boot.sole.y * px };
-    if (!boot.latched || !this.southPlant) {
-      return { drawX: rootDrawX, drawY: rootDrawY, sole: rootSole, latch: null, latchWorld: null, rootSole };
-    }
-    const world = southLatch(origin, this.southPlant.foot);
-    const latch = projectGround(world.x, world.y, cam);
-    if (!latch) return { drawX: rootDrawX, drawY: rootDrawY, sole: rootSole, latch: null, latchWorld: world, rootSole };
-    return {
-      drawX: latch.x - boot.sole.x * px,
-      drawY: latch.y - boot.sole.y * px,
-      sole: latch,
-      latch,
-      latchWorld: world,
-      rootSole,
-    };
+    const world = boot.latched && this.southPlant ? southLatch(origin, this.southPlant.foot) : null;
+    const placed = billboardBoot({ x: this.walker.x, y: this.walker.y }, world, boot.sole, feetX, feetY, px);
+    return { ...placed, latchWorld: world };
   }
 
   private noteSouthSole(
@@ -1317,6 +1283,7 @@ export class WalkMode {
       deltaPx: delta,
       rootSole: screen.rootSole,
       rootDeltaPx: rootDelta,
+      hud: document.getElementById("walk-input")?.textContent ?? "",
     });
   }
 
@@ -1332,13 +1299,7 @@ export class WalkMode {
   }
 
   /** Rear shaft, boots, cuff, cleared upper on W1/W3, response, then the front spear. */
-  private drawWestPlant(
-    feetX: number,
-    feetY: number,
-    px: number,
-    cam: TpsCamera,
-    pose: WestPose,
-  ): void {
+  private drawWestPlant(feetX: number, feetY: number, px: number, pose: WestPose): void {
     const layers = westLayers(pose);
     const plant = this.westPlant;
     const origin = plant ? { x: plant.originX, y: plant.originY } : { x: this.walker.x, y: this.walker.y };
@@ -1346,9 +1307,9 @@ export class WalkMode {
       if (layer.kind === "boot") {
         const img = this.westPlates[layer.boot.file];
         if (!img) return;
-        const screen = this.westBootScreen(layer.boot, origin, feetX, feetY, px, cam);
+        const screen = this.westBootScreen(layer.boot, origin, feetX, feetY, px);
         this.ctx.drawImage(img, screen.drawX, screen.drawY, WALK_FRAME_W * px, WALK_FRAME_H * px);
-        this.noteWestSole(pose.id, layer.boot, screen, (px * WALK_ANCHOR_Y) / HUNTER_BODY_SCALE);
+        this.noteWestSole(pose.id, layer.boot, screen, px);
         continue;
       }
       const img = this.westPlates[layer.file];
@@ -1369,7 +1330,6 @@ export class WalkMode {
     feetX: number,
     feetY: number,
     px: number,
-    cam: TpsCamera,
   ): {
     drawX: number;
     drawY: number;
@@ -1378,23 +1338,9 @@ export class WalkMode {
     latchWorld: { x: number; y: number } | null;
     rootSole: { x: number; y: number };
   } {
-    const rootDrawX = feetX - WALK_ANCHOR_X * px;
-    const rootDrawY = feetY - WALK_ANCHOR_Y * px;
-    const rootSole = { x: rootDrawX + boot.sole.x * px, y: rootDrawY + boot.sole.y * px };
-    if (!boot.latched || !this.westPlant) {
-      return { drawX: rootDrawX, drawY: rootDrawY, sole: rootSole, latch: null, latchWorld: null, rootSole };
-    }
-    const world = westLatch(origin, this.westPlant.foot);
-    const latch = projectGround(world.x, world.y, cam);
-    if (!latch) return { drawX: rootDrawX, drawY: rootDrawY, sole: rootSole, latch: null, latchWorld: world, rootSole };
-    return {
-      drawX: latch.x - boot.sole.x * px,
-      drawY: latch.y - boot.sole.y * px,
-      sole: latch,
-      latch,
-      latchWorld: world,
-      rootSole,
-    };
+    const world = boot.latched && this.westPlant ? westLatch(origin, this.westPlant.foot) : null;
+    const placed = billboardBoot({ x: this.walker.x, y: this.walker.y }, world, boot.sole, feetX, feetY, px);
+    return { ...placed, latchWorld: world };
   }
 
   private noteWestSole(
@@ -1433,6 +1379,7 @@ export class WalkMode {
       deltaPx: delta,
       rootSole: screen.rootSole,
       rootDeltaPx: rootDelta,
+      hud: document.getElementById("walk-input")?.textContent ?? "",
     });
   }
 
@@ -1442,7 +1389,6 @@ export class WalkMode {
     feetX: number,
     feetY: number,
     px: number,
-    cam: TpsCamera,
   ): {
     drawX: number;
     drawY: number;
@@ -1451,24 +1397,10 @@ export class WalkMode {
     latchWorld: { x: number; y: number } | null;
     rootSole: { x: number; y: number };
   } {
-    const rootDrawX = feetX - WALK_ANCHOR_X * px;
-    const rootDrawY = feetY - WALK_ANCHOR_Y * px;
-    const rootSole = { x: rootDrawX + boot.sole.x * px, y: rootDrawY + boot.sole.y * px };
-    const plantFoot = this.eastPlant?.foot ?? 0;
-    if (!boot.latched || (boot.role !== "support" && boot.role !== "outgoing")) {
-      return { drawX: rootDrawX, drawY: rootDrawY, sole: rootSole, latch: null, latchWorld: null, rootSole };
-    }
-    const world = latchWorld(origin, plantFoot, boot.role);
-    const latch = projectGround(world.x, world.y, cam);
-    if (!latch) return { drawX: rootDrawX, drawY: rootDrawY, sole: rootSole, latch: null, latchWorld: world, rootSole };
-    return {
-      drawX: latch.x - boot.sole.x * px,
-      drawY: latch.y - boot.sole.y * px,
-      sole: latch,
-      latch,
-      latchWorld: world,
-      rootSole,
-    };
+    const planted = !!this.eastPlant && boot.latched && (boot.role === "support" || boot.role === "outgoing");
+    const world = planted ? latchWorld(origin, this.eastPlant?.foot ?? 0, boot.role === "outgoing" ? "outgoing" : "support") : null;
+    const placed = billboardBoot({ x: this.walker.x, y: this.walker.y }, world, boot.sole, feetX, feetY, px);
+    return { ...placed, latchWorld: world };
   }
 
   private noteSole(
@@ -1507,6 +1439,7 @@ export class WalkMode {
       deltaPx: delta,
       rootSole: screen.rootSole,
       rootDeltaPx: rootDelta,
+      hud: document.getElementById("walk-input")?.textContent ?? "",
     });
   }
 }
