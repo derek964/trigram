@@ -2,10 +2,11 @@ import { GOAL, GOAL_RADIUS, MAZE_GRID, PLAYER_RADIUS, START, type Grid } from ".
 
 export const MOVE_SPEED = 2.55;
 /**
- * North, south, and west still use the four-frame V6 sheets. Their same-foot
- * sample step measures 0.256 world, so four samples are 1.024. That number is
- * the sheet measurement, not the east plant. East plants use 0.440 and do not
- * read this. The foot stays fixed while a frame is held, so the distance still slides.
+ * West still uses the four-frame V6 sheet. North and south plants, and that
+ * west sheet, share the measured same-foot step of 0.256, so four holds are
+ * 1.024. That number is the sheet measurement, not the east plant. East plants
+ * use 0.440 and do not read this. A held west frame still slides. Planted
+ * north and south boots lock to a world sole instead.
  */
 export const WALK_CYCLE_DISTANCE = 1.024;
 /** Measured V6 same-foot step on the north, south, and west sheets. Not 0.440. */
