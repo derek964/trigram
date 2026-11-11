@@ -11,6 +11,9 @@ export const SOUTH_PLANT_DISTANCE = 0.256;
 /** Two same-foot plants, S0–S1 then S2–S3. Not a new stride. */
 export const SOUTH_PLANT_PAIR = SOUTH_PLANT_DISTANCE * 2;
 export const SOUTH_UPPER = "shared-s-fixed-upper.png";
+/** Shared upper with the official S1/S3 mask already zeroed. Not an alpha punch of the response plate. */
+export const SOUTH_UPPER_S1 = "shared-s-fixed-upper-cleared-S1.png";
+export const SOUTH_UPPER_S3 = "shared-s-fixed-upper-cleared-S3.png";
 export const SOUTH_SHARED_SPEAR = "shared-s-spear.png";
 
 export type SouthFoot = 0 | 1;
@@ -29,7 +32,9 @@ export interface SouthPose {
   /** Front spear, drawn after the body. S0, S2, and idle share one plate. */
   spear: string;
   trousers: string;
-  /** S1/S3 replacement for the cleared arm-response region. Not an alpha-over. */
+  /** Unpunched shared upper, or the official pre-cleared upper on S1/S3. */
+  upper: string;
+  /** S1/S3 replacement drawn into the cleared region. Not an alpha-over of the unpunched upper. */
   response: string | null;
   /** Back to front: smaller sole y first. */
   boots: SouthBoot[];
@@ -52,6 +57,7 @@ const POSES: Record<SouthPoseId, SouthPose> = {
     id: "S0",
     spear: SOUTH_SHARED_SPEAR,
     trousers: "trousers-S0.png",
+    upper: SOUTH_UPPER,
     response: null,
     boots: [
       { file: "boot-foot1-S0-swing.png", foot: 1, sole: { x: 318.5, y: 587 }, latched: false, role: "swing" },
@@ -62,6 +68,7 @@ const POSES: Record<SouthPoseId, SouthPose> = {
     id: "S1",
     spear: "s-spear-S1.png",
     trousers: "trousers-S1.png",
+    upper: SOUTH_UPPER_S1,
     response: "s-response-S1.png",
     boots: [
       { file: "boot-foot0-S1.png", foot: 0, sole: { x: 257.5, y: 569 }, latched: true, role: "support" },
@@ -72,6 +79,7 @@ const POSES: Record<SouthPoseId, SouthPose> = {
     id: "S2",
     spear: SOUTH_SHARED_SPEAR,
     trousers: "trousers-S2.png",
+    upper: SOUTH_UPPER,
     response: null,
     boots: [
       { file: "boot-foot0-S2-swing.png", foot: 0, sole: { x: 257.5, y: 557 }, latched: false, role: "swing" },
@@ -82,6 +90,7 @@ const POSES: Record<SouthPoseId, SouthPose> = {
     id: "S3",
     spear: "s-spear-S3.png",
     trousers: "trousers-S3.png",
+    upper: SOUTH_UPPER_S3,
     response: "s-response-S3.png",
     boots: [
       { file: "boot-foot0-S3-swing.png", foot: 0, sole: { x: 225.5, y: 567 }, latched: false, role: "swing" },
@@ -92,6 +101,7 @@ const POSES: Record<SouthPoseId, SouthPose> = {
     id: "idle",
     spear: SOUTH_SHARED_SPEAR,
     trousers: "trousers-idle.png",
+    upper: SOUTH_UPPER,
     response: null,
     boots: [
       { file: "boot-foot0-idle.png", foot: 0, sole: { x: 225.5, y: 585 }, latched: false, role: "stand" },
@@ -111,14 +121,15 @@ export function southIdlePose(): SouthPose {
 }
 
 /**
- * Back to front. Boots by sole y, then the cuff, then the shared upper,
+ * Back to front. Boots by sole y, then the cuff, then the upper,
  * then the S1/S3 replacement, then the front spear. No rear shaft.
+ * S1 and S3 use the pre-cleared upper so the unwarped cloak is already gone.
  */
 export function southLayers(pose: SouthPose): SouthLayer[] {
   const boots = [...pose.boots].sort((a, b) => a.sole.y - b.sole.y || a.sole.x - b.sole.x);
   const layers: SouthLayer[] = boots.map((boot) => ({ kind: "boot", boot }));
   layers.push({ kind: "root", file: pose.trousers, role: "trousers" });
-  layers.push({ kind: "root", file: SOUTH_UPPER, role: "upper" });
+  layers.push({ kind: "root", file: pose.upper, role: "upper" });
   if (pose.response) layers.push({ kind: "root", file: pose.response, role: "response" });
   layers.push({ kind: "root", file: pose.spear, role: "spear" });
   return layers;

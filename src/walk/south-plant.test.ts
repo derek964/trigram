@@ -5,6 +5,8 @@ import { NSW_MEASURED_STEP, WALK_CYCLE_DISTANCE } from "./motion";
 import {
   SOUTH_PLANT_DISTANCE,
   SOUTH_UPPER,
+  SOUTH_UPPER_S1,
+  SOUTH_UPPER_S3,
   southIdlePose,
   southLatch,
   southLayers,
@@ -73,11 +75,14 @@ test("south plates draw boots, cuff, upper, response, then the front spear", () 
       "boot-foot0-S1.png",
       "boot-foot1-S1-swing.png",
       "trousers-S1.png",
-      SOUTH_UPPER,
+      SOUTH_UPPER_S1,
       "s-response-S1.png",
       "s-spear-S1.png",
     ],
   );
+  assert.equal(late.some((layer) => layer.kind === "root" && layer.file === SOUTH_UPPER), false);
+  assert.equal(southLayers(southPose(1, 0.2)).some((layer) => layer.kind === "root" && layer.file === SOUTH_UPPER_S3), true);
+  assert.equal(southLayers(southPose(0, 0.02)).some((layer) => layer.kind === "root" && layer.file === SOUTH_UPPER), true);
   assert.equal(late.some((layer) => layer.kind === "root" && layer.file.includes("shaft")), false);
   const stand = southIdlePose();
   assert.equal(stand.boots.some((boot) => boot.latched), false);
