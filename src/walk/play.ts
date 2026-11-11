@@ -5,7 +5,7 @@
  */
 import { FLAG_URL, GRASS_URLS, HUNTER_URL } from "./art";
 import { GOAL, MAZE_GRID, MAZE_ROWS, START } from "./maze";
-import { WALK_CYCLE_DISTANCE, createWalker, isWall, stepWalker, type Walker } from "./motion";
+import { WALK_CYCLE_DISTANCE, createWalker, isWall, samplePlantLocal, stepWalker, type Walker } from "./motion";
 import { revealRect, shouldCutaway } from "./occlusion";
 import {
   TPS_EYE_HEIGHT,
@@ -104,6 +104,7 @@ interface PlantSample {
   /** Where this plate's sole would sit if the whole cell stayed on the root. */
   rootSole: { x: number; y: number };
   rootDeltaPx: number | null;
+  artDelta: number | null;
   hud: string;
 }
 
@@ -493,6 +494,12 @@ export class WalkMode {
       "boot-foot0-N1-swing.png",
       "boot-foot1-N2-swing.png",
       "boot-foot1-N3-swing.png",
+      "boot-foot1-N01.png",
+      "boot-foot0-N01-swing.png",
+      "boot-foot0-N23.png",
+      "boot-foot1-N23-swing.png",
+      "trousers-N01.png",
+      "trousers-N23.png",
     ];
     await Promise.all(
       northNames.map(async (name) => {
@@ -524,6 +531,12 @@ export class WalkMode {
       "boot-foot1-S1-swing.png",
       "boot-foot0-S2-swing.png",
       "boot-foot0-S3-swing.png",
+      "boot-foot0-S01.png",
+      "boot-foot1-S01-swing.png",
+      "boot-foot1-S23.png",
+      "boot-foot0-S23-swing.png",
+      "trousers-S01.png",
+      "trousers-S23.png",
     ];
     await Promise.all(
       southNames.map(async (name) => {
@@ -556,6 +569,12 @@ export class WalkMode {
       "boot-foot1-W1-swing.png",
       "boot-foot0-W2-swing.png",
       "boot-foot0-W3-swing.png",
+      "boot-foot0-W01.png",
+      "boot-foot1-W01-swing.png",
+      "boot-foot1-W23.png",
+      "boot-foot0-W23-swing.png",
+      "trousers-W01.png",
+      "trousers-W23.png",
     ];
     await Promise.all(
       westNames.map(async (name) => {
@@ -570,7 +589,7 @@ export class WalkMode {
       const northCount = Object.keys(this.northPlates).length;
       const southCount = Object.keys(this.southPlates).length;
       const westCount = Object.keys(this.westPlates).length;
-      note.textContent = `东向植靴 ${PLANT_DISTANCE}，北向植靴 ${NORTH_PLANT_DISTANCE}，南向植靴 ${SOUTH_PLANT_DISTANCE}，西向植靴 ${WEST_PLANT_DISTANCE}。上身跟根。北南西步距仍是测得的 ${WALK_CYCLE_DISTANCE}。东层 ${plates}/12，北层 ${northCount}/21，南层 ${southCount}/23，西层 ${westCount}/24。不是步态终稿。`;
+      note.textContent = `东向植靴 ${PLANT_DISTANCE}，北向植靴 ${NORTH_PLANT_DISTANCE}，南向植靴 ${SOUTH_PLANT_DISTANCE}，西向植靴 ${WEST_PLANT_DISTANCE}。上身跟根。北南西步距仍是测得的 ${WALK_CYCLE_DISTANCE}。东层 ${plates}/12，北层 ${northCount}/27，南层 ${southCount}/29，西层 ${westCount}/30。不是步态终稿。`;
     } else if (note && missing.length) {
       note.textContent = `行走帧缺失：${missing.join(" ")}。缺的方向不用单张冒充迈步。`;
     }
@@ -1092,7 +1111,7 @@ export class WalkMode {
   }
 
   private northPlatesReady(): boolean {
-    return !!this.northPlates["shared-n-fixed-upper.png"] && !!this.northPlates["shared-n-spear.png"] && Object.keys(this.northPlates).length >= 21;
+    return !!this.northPlates["shared-n-fixed-upper.png"] && !!this.northPlates["shared-n-spear.png"] && !!this.northPlates["trousers-N01.png"] && Object.keys(this.northPlates).length >= 27;
   }
 
   /** Spear, then boots, trousers, upper, then the N1/N3 cloak-edge plate. */
@@ -1165,9 +1184,7 @@ export class WalkMode {
   ): void {
     const plant = this.northPlant;
     if (!plant || pose === "idle" || this.plantLog.length >= 800) return;
-    const nearEntry = plant.local < 0.06;
-    const nearTrail = plant.local > NORTH_PLANT_DISTANCE - 0.05;
-    if (!nearEntry && !nearTrail) return;
+    if (!samplePlantLocal(plant.local, NORTH_PLANT_DISTANCE)) return;
     const delta = screen.latch ? Math.hypot(screen.sole.x - screen.latch.x, screen.sole.y - screen.latch.y) : null;
     const rootDelta = screen.latch
       ? Math.hypot(screen.rootSole.x - screen.latch.x, screen.rootSole.y - screen.latch.y)
@@ -1188,6 +1205,7 @@ export class WalkMode {
       deltaPx: delta,
       rootSole: screen.rootSole,
       rootDeltaPx: rootDelta,
+      artDelta: rootDelta != null && scale ? rootDelta / scale : null,
       hud: document.getElementById("walk-input")?.textContent ?? "",
     });
   }
@@ -1198,7 +1216,8 @@ export class WalkMode {
       !!this.southPlates["shared-s-fixed-upper-cleared-S1.png"] &&
       !!this.southPlates["shared-s-fixed-upper-cleared-S3.png"] &&
       !!this.southPlates["shared-s-spear.png"] &&
-      Object.keys(this.southPlates).length >= 23
+      !!this.southPlates["trousers-S01.png"] &&
+      Object.keys(this.southPlates).length >= 29
     );
   }
 
@@ -1260,9 +1279,7 @@ export class WalkMode {
   ): void {
     const plant = this.southPlant;
     if (!plant || pose === "idle" || this.plantLog.length >= 800) return;
-    const nearEntry = plant.local < 0.06;
-    const nearTrail = plant.local > SOUTH_PLANT_DISTANCE - 0.05;
-    if (!nearEntry && !nearTrail) return;
+    if (!samplePlantLocal(plant.local, SOUTH_PLANT_DISTANCE)) return;
     const delta = screen.latch ? Math.hypot(screen.sole.x - screen.latch.x, screen.sole.y - screen.latch.y) : null;
     const rootDelta = screen.latch
       ? Math.hypot(screen.rootSole.x - screen.latch.x, screen.rootSole.y - screen.latch.y)
@@ -1283,6 +1300,7 @@ export class WalkMode {
       deltaPx: delta,
       rootSole: screen.rootSole,
       rootDeltaPx: rootDelta,
+      artDelta: rootDelta != null && scale ? rootDelta / scale : null,
       hud: document.getElementById("walk-input")?.textContent ?? "",
     });
   }
@@ -1294,7 +1312,8 @@ export class WalkMode {
       !!this.westPlates["shared-w-fixed-upper-cleared-W1.png"] &&
       !!this.westPlates["shared-w-fixed-upper-cleared-W3.png"] &&
       !!this.westPlates["shared-w-spear.png"] &&
-      Object.keys(this.westPlates).length >= 24
+      !!this.westPlates["trousers-W01.png"] &&
+      Object.keys(this.westPlates).length >= 30
     );
   }
 
@@ -1356,9 +1375,7 @@ export class WalkMode {
   ): void {
     const plant = this.westPlant;
     if (!plant || pose === "idle" || this.plantLog.length >= 800) return;
-    const nearEntry = plant.local < 0.06;
-    const nearTrail = plant.local > WEST_PLANT_DISTANCE - 0.05;
-    if (!nearEntry && !nearTrail) return;
+    if (!samplePlantLocal(plant.local, WEST_PLANT_DISTANCE)) return;
     const delta = screen.latch ? Math.hypot(screen.sole.x - screen.latch.x, screen.sole.y - screen.latch.y) : null;
     const rootDelta = screen.latch
       ? Math.hypot(screen.rootSole.x - screen.latch.x, screen.rootSole.y - screen.latch.y)
@@ -1379,6 +1396,7 @@ export class WalkMode {
       deltaPx: delta,
       rootSole: screen.rootSole,
       rootDeltaPx: rootDelta,
+      artDelta: rootDelta != null && scale ? rootDelta / scale : null,
       hud: document.getElementById("walk-input")?.textContent ?? "",
     });
   }
@@ -1416,9 +1434,7 @@ export class WalkMode {
   ): void {
     const plant = this.eastPlant;
     if (!plant || this.plantLog.length >= 480) return;
-    const nearEntry = plant.local < 0.06;
-    const nearTrail = plant.local > PLANT_DISTANCE - 0.05;
-    if (!nearEntry && !nearTrail) return;
+    if (!samplePlantLocal(plant.local, PLANT_DISTANCE)) return;
     const delta = screen.latch ? Math.hypot(screen.sole.x - screen.latch.x, screen.sole.y - screen.latch.y) : null;
     const rootDelta = screen.latch
       ? Math.hypot(screen.rootSole.x - screen.latch.x, screen.rootSole.y - screen.latch.y)
@@ -1439,6 +1455,7 @@ export class WalkMode {
       deltaPx: delta,
       rootSole: screen.rootSole,
       rootDeltaPx: rootDelta,
+      artDelta: rootDelta != null && scale ? rootDelta / scale : null,
       hud: document.getElementById("walk-input")?.textContent ?? "",
     });
   }

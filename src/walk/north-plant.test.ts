@@ -44,4 +44,12 @@ test("a north stop freezes the plant and a side step drops it", () => {
   );
   assert.equal(entry.response, null);
   assert.equal(northPose(1, 0.2).response, "n-response-N1.png");
+  const mid = northPose(1, 0.128);
+  assert.equal(mid.id, "N01");
+  assert.equal(mid.spear, "n-spear-N1.png");
+  assert.equal(mid.response, "n-response-N1.png");
+  assert.equal(mid.trousers, "trousers-N01.png");
+  assert.deepEqual(mid.boots.find((boot) => boot.role === "support")?.sole, { x: 286, y: 615 });
+  assert.equal(northPose(1, 0.063).id, "N0");
+  assert.equal(northPose(1, 0.192).id, "N1");
 });

@@ -5,6 +5,7 @@
  * The root stays on the grid. World y is held. This is not a gait pass.
  */
 import { artToWorld, type ArtPoint, type WorldPoint } from "./east-plant";
+import { nswPoseWindow } from "./motion";
 
 export const WEST_PLANT_DISTANCE = 0.256;
 /** Two same-foot plants, W0–W1 then W2–W3. Not a new stride. */
@@ -19,7 +20,7 @@ export const WEST_SHARED_SPEAR = "shared-w-spear.png";
 export const WEST_IDLE_FOOT1_PLATE_SOLE: ArtPoint = { x: 268.5, y: 594 };
 
 export type WestFoot = 0 | 1;
-export type WestPoseId = "W0" | "W1" | "W2" | "W3" | "idle";
+export type WestPoseId = "W0" | "W01" | "W1" | "W2" | "W23" | "W3" | "idle";
 
 export interface WestBoot {
   file: string;
@@ -64,6 +65,17 @@ const POSES: Record<WestPoseId, WestPose> = {
       { file: "boot-foot1-W0-swing.png", foot: 1, sole: { x: 300.5, y: 598 }, latched: false, role: "swing" },
     ],
   },
+  W01: {
+    id: "W01",
+    spear: "w-spear-W1.png",
+    trousers: "trousers-W01.png",
+    upper: WEST_UPPER_W1,
+    response: "w-response-W1.png",
+    boots: [
+      { file: "boot-foot1-W01-swing.png", foot: 1, sole: { x: 284.5, y: 587 }, latched: false, role: "swing" },
+      { file: "boot-foot0-W01.png", foot: 0, sole: { x: 244.5, y: 606 }, latched: true, role: "support" },
+    ],
+  },
   W1: {
     id: "W1",
     spear: "w-spear-W1.png",
@@ -84,6 +96,17 @@ const POSES: Record<WestPoseId, WestPose> = {
     boots: [
       { file: "boot-foot1-W2.png", foot: 1, sole: { x: 236.5, y: 578 }, latched: true, role: "support" },
       { file: "boot-foot0-W2-swing.png", foot: 0, sole: { x: 300.5, y: 622 }, latched: false, role: "swing" },
+    ],
+  },
+  W23: {
+    id: "W23",
+    spear: "w-spear-W3.png",
+    trousers: "trousers-W23.png",
+    upper: WEST_UPPER_W3,
+    response: "w-response-W3.png",
+    boots: [
+      { file: "boot-foot1-W23.png", foot: 1, sole: { x: 268.5, y: 594 }, latched: true, role: "support" },
+      { file: "boot-foot0-W23-swing.png", foot: 0, sole: { x: 272.5, y: 605 }, latched: false, role: "swing" },
     ],
   },
   W3: {
@@ -112,9 +135,15 @@ const POSES: Record<WestPoseId, WestPose> = {
 };
 
 export function westPose(foot: WestFoot, local: number): WestPose {
-  const trailing = local >= WEST_PLANT_DISTANCE * 0.5;
-  if (foot === 0) return trailing ? POSES.W1 : POSES.W0;
-  return trailing ? POSES.W3 : POSES.W2;
+  const window = nswPoseWindow(local);
+  if (foot === 0) {
+    if (window === "entry") return POSES.W0;
+    if (window === "mid") return POSES.W01;
+    return POSES.W1;
+  }
+  if (window === "entry") return POSES.W2;
+  if (window === "mid") return POSES.W23;
+  return POSES.W3;
 }
 
 export function westIdlePose(): WestPose {

@@ -5,13 +5,14 @@
  * The root stays on the grid. This is not a gait pass.
  */
 import { artToWorld, type ArtPoint, type WorldPoint } from "./east-plant";
+import { nswPoseWindow } from "./motion";
 
 export const NORTH_PLANT_DISTANCE = 0.256;
 /** Two same-foot plants, N0–N1 then N2–N3. Not a new stride. */
 export const NORTH_PLANT_PAIR = NORTH_PLANT_DISTANCE * 2;
 
 export type NorthFoot = 0 | 1;
-export type NorthPoseId = "N0" | "N1" | "N2" | "N3" | "idle";
+export type NorthPoseId = "N0" | "N01" | "N1" | "N2" | "N23" | "N3" | "idle";
 
 export interface NorthBoot {
   file: string;
@@ -49,6 +50,16 @@ const POSES: Record<NorthPoseId, NorthPose> = {
       { file: "boot-foot1-N0.png", foot: 1, sole: { x: 318, y: 599 }, latched: true, role: "support" },
     ],
   },
+  N01: {
+    id: "N01",
+    spear: "n-spear-N1.png",
+    trousers: "trousers-N01.png",
+    response: "n-response-N1.png",
+    boots: [
+      { file: "boot-foot0-N01-swing.png", foot: 0, sole: { x: 210, y: 578 }, latched: false, role: "swing" },
+      { file: "boot-foot1-N01.png", foot: 1, sole: { x: 286, y: 615 }, latched: true, role: "support" },
+    ],
+  },
   N1: {
     id: "N1",
     spear: "n-spear-N1.png",
@@ -67,6 +78,16 @@ const POSES: Record<NorthPoseId, NorthPose> = {
     boots: [
       { file: "boot-foot0-N2.png", foot: 0, sole: { x: 258, y: 569 }, latched: true, role: "support" },
       { file: "boot-foot1-N2-swing.png", foot: 1, sole: { x: 286, y: 635 }, latched: false, role: "swing" },
+    ],
+  },
+  N23: {
+    id: "N23",
+    spear: "n-spear-N3.png",
+    trousers: "trousers-N23.png",
+    response: "n-response-N3.png",
+    boots: [
+      { file: "boot-foot0-N23.png", foot: 0, sole: { x: 226, y: 585 }, latched: true, role: "support" },
+      { file: "boot-foot1-N23-swing.png", foot: 1, sole: { x: 286, y: 616 }, latched: false, role: "swing" },
     ],
   },
   N3: {
@@ -92,9 +113,15 @@ const POSES: Record<NorthPoseId, NorthPose> = {
 };
 
 export function northPose(foot: NorthFoot, local: number): NorthPose {
-  const trailing = local >= NORTH_PLANT_DISTANCE * 0.5;
-  if (foot === 1) return trailing ? POSES.N1 : POSES.N0;
-  return trailing ? POSES.N3 : POSES.N2;
+  const window = nswPoseWindow(local);
+  if (foot === 1) {
+    if (window === "entry") return POSES.N0;
+    if (window === "mid") return POSES.N01;
+    return POSES.N1;
+  }
+  if (window === "entry") return POSES.N2;
+  if (window === "mid") return POSES.N23;
+  return POSES.N3;
 }
 
 export function northIdlePose(): NorthPose {

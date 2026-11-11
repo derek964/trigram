@@ -6,6 +6,7 @@
  * This is not a gait pass.
  */
 import { artToWorld, type ArtPoint, type WorldPoint } from "./east-plant";
+import { nswPoseWindow } from "./motion";
 
 export const SOUTH_PLANT_DISTANCE = 0.256;
 /** Two same-foot plants, S0–S1 then S2–S3. Not a new stride. */
@@ -17,7 +18,7 @@ export const SOUTH_UPPER_S3 = "shared-s-fixed-upper-cleared-S3.png";
 export const SOUTH_SHARED_SPEAR = "shared-s-spear.png";
 
 export type SouthFoot = 0 | 1;
-export type SouthPoseId = "S0" | "S1" | "S2" | "S3" | "idle";
+export type SouthPoseId = "S0" | "S01" | "S1" | "S2" | "S23" | "S3" | "idle";
 
 export interface SouthBoot {
   file: string;
@@ -64,6 +65,17 @@ const POSES: Record<SouthPoseId, SouthPose> = {
       { file: "boot-foot0-S0.png", foot: 0, sole: { x: 193.5, y: 601 }, latched: true, role: "support" },
     ],
   },
+  S01: {
+    id: "S01",
+    spear: "s-spear-S1.png",
+    trousers: "trousers-S01.png",
+    upper: SOUTH_UPPER_S1,
+    response: "s-response-S1.png",
+    boots: [
+      { file: "boot-foot0-S01.png", foot: 0, sole: { x: 225.5, y: 585 }, latched: true, role: "support" },
+      { file: "boot-foot1-S01-swing.png", foot: 1, sole: { x: 310.5, y: 596 }, latched: false, role: "swing" },
+    ],
+  },
   S1: {
     id: "S1",
     spear: "s-spear-S1.png",
@@ -84,6 +96,17 @@ const POSES: Record<SouthPoseId, SouthPose> = {
     boots: [
       { file: "boot-foot0-S2-swing.png", foot: 0, sole: { x: 257.5, y: 557 }, latched: false, role: "swing" },
       { file: "boot-foot1-S2.png", foot: 1, sole: { x: 254.5, y: 631 }, latched: true, role: "support" },
+    ],
+  },
+  S23: {
+    id: "S23",
+    spear: "s-spear-S3.png",
+    trousers: "trousers-S23.png",
+    upper: SOUTH_UPPER_S3,
+    response: "s-response-S3.png",
+    boots: [
+      { file: "boot-foot0-S23-swing.png", foot: 0, sole: { x: 241.5, y: 562 }, latched: false, role: "swing" },
+      { file: "boot-foot1-S23.png", foot: 1, sole: { x: 286.5, y: 615 }, latched: true, role: "support" },
     ],
   },
   S3: {
@@ -111,9 +134,15 @@ const POSES: Record<SouthPoseId, SouthPose> = {
 };
 
 export function southPose(foot: SouthFoot, local: number): SouthPose {
-  const trailing = local >= SOUTH_PLANT_DISTANCE * 0.5;
-  if (foot === 0) return trailing ? POSES.S1 : POSES.S0;
-  return trailing ? POSES.S3 : POSES.S2;
+  const window = nswPoseWindow(local);
+  if (foot === 0) {
+    if (window === "entry") return POSES.S0;
+    if (window === "mid") return POSES.S01;
+    return POSES.S1;
+  }
+  if (window === "entry") return POSES.S2;
+  if (window === "mid") return POSES.S23;
+  return POSES.S3;
 }
 
 export function southIdlePose(): SouthPose {

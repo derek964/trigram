@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { PLANT_DISTANCE, artToWorld } from "./east-plant";
+import { PLANT_DISTANCE, artToWorld, worldToArt } from "./east-plant";
 import { NSW_MEASURED_STEP, WALK_CYCLE_DISTANCE } from "./motion";
 import {
   WEST_IDLE_FOOT1_PLATE_SOLE,
@@ -84,4 +84,18 @@ test("west plates draw the rear shaft, then the cleared upper, then the response
   const idleLock = artToWorld(WEST_IDLE_FOOT1_PLATE_SOLE);
   const walkLock = artToWorld(westPose(0, 0).boots.find((boot) => boot.role === "support")!.sole);
   assert.ok(Math.hypot(idleLock.x - walkLock.x, idleLock.y - walkLock.y) > 0.05);
+  const mid = westPose(0, 0.128);
+  assert.equal(mid.id, "W01");
+  assert.equal(mid.upper, WEST_UPPER_W1);
+  assert.equal(mid.response, "w-response-W1.png");
+  assert.equal(mid.spear, "w-spear-W1.png");
+  assert.notEqual(mid.id, "idle");
+  const origin = { x: 2.2, y: 1.5 };
+  const latch = westLatch(origin, 0);
+  const root = { x: origin.x - 0.128, y: origin.y };
+  const sole = mid.boots.find((boot) => boot.role === "support")!;
+  const art = worldToArt({ x: latch.x - root.x, y: latch.y - root.y });
+  assert.ok(Math.hypot(art.x - sole.sole.x, art.y - sole.sole.y) < 1e-6);
+  assert.equal(westPose(0, 0.192).id, "W1");
+  assert.equal(westIdlePose().boots.find((boot) => boot.foot === 1)?.latched, false);
 });

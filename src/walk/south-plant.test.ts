@@ -102,7 +102,12 @@ test("a south latch shifts the boot in billboard art, not by a floor projection"
     return { dx: art.x - sole.sole.x, dy: art.y - sole.sole.y };
   };
   const mid = gap(0.128);
-  assert.ok(Math.abs(Math.hypot(mid.dx, mid.dy) - 35.78) < 0.05);
+  assert.equal(southPose(0, 0.128).id, "S01");
+  assert.equal(southPose(0, 0.063).id, "S0");
+  assert.equal(southPose(0, 0.192).id, "S1");
+  assert.ok(Math.hypot(mid.dx, mid.dy) < 1e-6);
+  assert.equal(southPose(0, 0.128).upper, SOUTH_UPPER_S1);
+  assert.notEqual(southPose(0, 0.128).id, "idle");
   const late = gap(0.24);
   assert.ok(Math.abs(Math.hypot(late.dx, late.dy) - 4.47) < 0.05);
   const measured = gap(0.2184);

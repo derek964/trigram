@@ -10,6 +10,25 @@ export const MOVE_SPEED = 2.55;
 export const WALK_CYCLE_DISTANCE = 1.024;
 /** Measured V6 same-foot step on the north, south, and west sheets. Not 0.440. */
 export const NSW_MEASURED_STEP = 0.256;
+/** Windows of one 0.256 plant. Not slices of the 1.024 cycle. */
+export const NSW_ENTRY_END = 0.064;
+export const NSW_MID_END = 0.192;
+
+export function nswPoseWindow(local: number): "entry" | "mid" | "trail" {
+  if (local < NSW_ENTRY_END) return "entry";
+  if (local < NSW_MID_END) return "mid";
+  return "trail";
+}
+
+/** Entry, the 0.064 and 0.192 edges, local 0.128, and the trailing end. */
+export function samplePlantLocal(local: number, distance: number): boolean {
+  if (local < 0.06) return true;
+  if (local > distance - 0.05) return true;
+  if (Math.abs(local - NSW_ENTRY_END) < 0.02) return true;
+  if (Math.abs(local - 0.128) < 0.02) return true;
+  if (Math.abs(local - NSW_MID_END) < 0.02) return true;
+  return false;
+}
 export const WALK_PHASE_PER_UNIT = (Math.PI * 2) / WALK_CYCLE_DISTANCE;
 
 export interface Walker {
