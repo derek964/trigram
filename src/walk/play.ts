@@ -29,6 +29,15 @@ import {
   poseFor,
   stepEastPlant,
 } from "./east-plant";
+import {
+  NORTH_PLANT_DISTANCE,
+  type NorthBoot,
+  type NorthPlant,
+  northIdlePose,
+  northLatch,
+  northPose,
+  stepNorthPlant,
+} from "./north-plant";
 import { cardinalFromFacing, type Cardinal } from "./paper-hunter";
 import {
   HUNTER_BODY_SCALE,
@@ -55,6 +64,7 @@ type Img = HTMLImageElement;
 type Box = { sx: number; sy: number; sw: number; sh: number };
 
 interface PlantSample {
+  dir: "E" | "N";
   pose: string;
   foot: 0 | 1;
   role: string;
@@ -207,8 +217,10 @@ export class WalkMode {
   private readySent = false;
   private cutaways = 0;
   private eastPlant: EastPlant | null = null;
+  private northPlant: NorthPlant | null = null;
   private frozenWalk: { cardinal: Cardinal; frame: number } | null = null;
   private eastPlates: Record<string, Img> = {};
+  private northPlates: Record<string, Img> = {};
   private plantLog: PlantSample[] = [];
 
   constructor() {
@@ -242,6 +254,7 @@ export class WalkMode {
   restart(): void {
     this.walker = createWalker();
     this.eastPlant = null;
+    this.northPlant = null;
     this.frozenWalk = null;
     this.plantLog = [];
     this.win.classList.add("hidden");
@@ -428,11 +441,41 @@ export class WalkMode {
         if (img) this.eastPlates[name] = img;
       }),
     );
+    const northNames = [
+      "shared-n-fixed-upper.png",
+      "shared-n-spear.png",
+      "n-spear-N1.png",
+      "n-spear-N3.png",
+      "n-response-N1.png",
+      "n-response-N3.png",
+      "trousers-N0.png",
+      "trousers-N1.png",
+      "trousers-N2.png",
+      "trousers-N3.png",
+      "trousers-idle.png",
+      "boot-foot1-N0.png",
+      "boot-foot1-N1.png",
+      "boot-foot0-N2.png",
+      "boot-foot0-N3.png",
+      "boot-foot0-idle.png",
+      "boot-foot1-idle.png",
+      "boot-foot0-N0-swing.png",
+      "boot-foot0-N1-swing.png",
+      "boot-foot1-N2-swing.png",
+      "boot-foot1-N3-swing.png",
+    ];
+    await Promise.all(
+      northNames.map(async (name) => {
+        const img = await loadRgbaPng(assetUrl(`art/northline/${name}`), idleSizeOk);
+        if (img) this.northPlates[name] = img;
+      }),
+    );
     const missing = dirs.filter((dir) => !this.sheets[dir]);
     const note = document.getElementById("walk-limit");
     if (note && missing.length === 0) {
       const plates = Object.keys(this.eastPlates).length;
-      note.textContent = `东向植靴 ${PLANT_DISTANCE}，上身跟根。其他方向周期${WALK_CYCLE_DISTANCE}。分层 ${plates}/12。不是步态终稿。`;
+      const northCount = Object.keys(this.northPlates).length;
+      note.textContent = `东向植靴 ${PLANT_DISTANCE}，北向植靴 ${NORTH_PLANT_DISTANCE}。上身跟根。南北西步距仍是测得的 ${WALK_CYCLE_DISTANCE}。东层 ${plates}/12，北层 ${northCount}/21。不是步态终稿。`;
     } else if (note && missing.length) {
       note.textContent = `行走帧缺失：${missing.join(" ")}。缺的方向不用单张冒充迈步。`;
     }
@@ -456,8 +499,9 @@ export class WalkMode {
     const cardinal = cardinalFromFacing(this.walker.facing);
     const view = this.poseNow();
     const blocked = held.length > 0 && !this.walker.moving && !this.walker.won;
-    const holdingWalk = this.frozenWalk?.cardinal === cardinal && !this.walker.moving && !this.eastPlant;
-    const pose = this.eastPlant && !this.walker.moving
+    const holdingWalk =
+      this.frozenWalk?.cardinal === cardinal && !this.walker.moving && !this.eastPlant && !this.northPlant;
+    const pose = (this.eastPlant || this.northPlant) && !this.walker.moving
       ? "植停"
       : holdingWalk
         ? `停${this.frozenWalk?.frame ?? 0}`
@@ -474,7 +518,9 @@ export class WalkMode {
     const phase = this.walker.phase.toFixed(2);
     const plant = this.eastPlant
       ? ` · 东植${this.eastPlant.foot}${poseFor(this.eastPlant.foot, this.eastPlant.local).id.endsWith("trailing") ? "后" : "入"}${this.eastPlant.local.toFixed(2)}`
-      : "";
+      : this.northPlant
+        ? ` · 北植${northPose(this.northPlant.foot, this.northPlant.local).id}${this.northPlant.local.toFixed(2)}`
+        : "";
     el.textContent = `${this.buildLabel()} c${WALK_CYCLE_DISTANCE} · 输入 ${held.join("") || "无"} · 朝${cardinal} · 相位${phase} · ${gate} · ${pose}${plant}`;
   }
 
@@ -571,7 +617,14 @@ export class WalkMode {
         this.walker.moving,
         cardinal === "E",
       );
-      if (this.walker.moving && !(cardinal === "E" && this.eastPlant)) {
+      this.northPlant = stepNorthPlant(
+        this.northPlant,
+        prev,
+        this.walker,
+        this.walker.moving,
+        cardinal === "N",
+      );
+      if (this.walker.moving && !(cardinal === "E" && this.eastPlant) && !(cardinal === "N" && this.northPlant)) {
         this.frozenWalk = { cardinal, frame: sheetFrame(this.walker.phase, true) };
       }
       this.trackSettle();
@@ -762,6 +815,18 @@ export class WalkMode {
       ctx.restore();
       return;
     }
+    if (cardinal === "N" && this.northPlatesReady()) {
+      if (this.northPlant) {
+        this.drawNorthPlant(feetX, feetY, px, cam, northPose(this.northPlant.foot, this.northPlant.local));
+        ctx.restore();
+        return;
+      }
+      if (!this.walker.moving && this.frozenWalk?.cardinal !== "N") {
+        this.drawNorthPlant(feetX, feetY, px, cam, northIdlePose());
+        ctx.restore();
+        return;
+      }
+    }
     const view = this.poseNow();
     const settle = this.settles[`${cardinal}${this.settleFrom}`];
     if (view.kind === "settle" && settle) {
@@ -883,6 +948,122 @@ export class WalkMode {
     atRoot(upper);
   }
 
+  private northPlatesReady(): boolean {
+    return !!this.northPlates["shared-n-fixed-upper.png"] && !!this.northPlates["shared-n-spear.png"] && Object.keys(this.northPlates).length >= 21;
+  }
+
+  /** Spear, then boots, trousers, upper, then the N1/N3 cloak-edge plate. */
+  private drawNorthPlant(
+    feetX: number,
+    feetY: number,
+    px: number,
+    cam: TpsCamera,
+    pose: ReturnType<typeof northPose>,
+  ): void {
+    const spear = this.northPlates[pose.spear];
+    const upper = this.northPlates["shared-n-fixed-upper.png"];
+    const trousers = this.northPlates[pose.trousers];
+    if (!spear || !upper || !trousers) return;
+    const atRoot = (img: Img) => {
+      this.ctx.drawImage(
+        img,
+        feetX - WALK_ANCHOR_X * px,
+        feetY - WALK_ANCHOR_Y * px,
+        WALK_FRAME_W * px,
+        WALK_FRAME_H * px,
+      );
+    };
+    atRoot(spear);
+    const plant = this.northPlant;
+    const origin = plant ? { x: plant.originX, y: plant.originY } : { x: this.walker.x, y: this.walker.y };
+    for (const boot of pose.boots) {
+      const img = this.northPlates[boot.file];
+      if (!img) return;
+      const screen = this.northBootScreen(boot, origin, feetX, feetY, px, cam);
+      this.ctx.drawImage(img, screen.drawX, screen.drawY, WALK_FRAME_W * px, WALK_FRAME_H * px);
+      this.noteNorthSole(pose.id, boot, screen, (px * WALK_ANCHOR_Y) / HUNTER_BODY_SCALE);
+    }
+    atRoot(trousers);
+    atRoot(upper);
+    if (pose.response) {
+      const response = this.northPlates[pose.response];
+      if (response) atRoot(response);
+    }
+  }
+
+  private northBootScreen(
+    boot: NorthBoot,
+    origin: { x: number; y: number },
+    feetX: number,
+    feetY: number,
+    px: number,
+    cam: TpsCamera,
+  ): {
+    drawX: number;
+    drawY: number;
+    sole: { x: number; y: number };
+    latch: { x: number; y: number } | null;
+    latchWorld: { x: number; y: number } | null;
+    rootSole: { x: number; y: number };
+  } {
+    const rootDrawX = feetX - WALK_ANCHOR_X * px;
+    const rootDrawY = feetY - WALK_ANCHOR_Y * px;
+    const rootSole = { x: rootDrawX + boot.sole.x * px, y: rootDrawY + boot.sole.y * px };
+    if (!boot.latched || !this.northPlant) {
+      return { drawX: rootDrawX, drawY: rootDrawY, sole: rootSole, latch: null, latchWorld: null, rootSole };
+    }
+    const world = northLatch(origin, this.northPlant.foot);
+    const latch = projectGround(world.x, world.y, cam);
+    if (!latch) return { drawX: rootDrawX, drawY: rootDrawY, sole: rootSole, latch: null, latchWorld: world, rootSole };
+    return {
+      drawX: latch.x - boot.sole.x * px,
+      drawY: latch.y - boot.sole.y * px,
+      sole: latch,
+      latch,
+      latchWorld: world,
+      rootSole,
+    };
+  }
+
+  private noteNorthSole(
+    pose: string,
+    boot: NorthBoot,
+    screen: {
+      sole: { x: number; y: number };
+      latch: { x: number; y: number } | null;
+      latchWorld: { x: number; y: number } | null;
+      rootSole: { x: number; y: number };
+    },
+    scale: number,
+  ): void {
+    const plant = this.northPlant;
+    if (!plant || pose === "idle" || this.plantLog.length >= 800) return;
+    const nearEntry = plant.local < 0.06;
+    const nearTrail = plant.local > NORTH_PLANT_DISTANCE - 0.05;
+    if (!nearEntry && !nearTrail) return;
+    const delta = screen.latch ? Math.hypot(screen.sole.x - screen.latch.x, screen.sole.y - screen.latch.y) : null;
+    const rootDelta = screen.latch
+      ? Math.hypot(screen.rootSole.x - screen.latch.x, screen.rootSole.y - screen.latch.y)
+      : null;
+    this.plantLog.push({
+      dir: "N",
+      pose,
+      foot: boot.foot,
+      role: boot.role,
+      latched: boot.latched,
+      soleArt: boot.sole,
+      root: { x: this.walker.x, y: this.walker.y },
+      local: plant.local,
+      scale,
+      drawn: screen.sole,
+      latchWorld: screen.latchWorld,
+      latchScreen: screen.latch,
+      deltaPx: delta,
+      rootSole: screen.rootSole,
+      rootDeltaPx: rootDelta,
+    });
+  }
+
   private bootScreen(
     boot: PlantBoot,
     origin: { x: number; y: number },
@@ -939,6 +1120,7 @@ export class WalkMode {
       ? Math.hypot(screen.rootSole.x - screen.latch.x, screen.rootSole.y - screen.latch.y)
       : null;
     this.plantLog.push({
+      dir: "E",
       pose,
       foot: boot.foot,
       role: boot.role,
