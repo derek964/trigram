@@ -484,6 +484,18 @@ export class WalkMode {
       "trousers-E1-0.110.png",
       "trousers-E0-0.330.png",
       "trousers-E1-0.330.png",
+      "boot-foot0-E0-0.385.png",
+      "boot-foot1-E1-0.385.png",
+      "boot-foot0-E0-0.4125.png",
+      "boot-foot1-E1-0.4125.png",
+      "boot-foot1-E0-0.385-swing.png",
+      "boot-foot0-E1-0.385-swing.png",
+      "boot-foot1-E0-0.4125-swing.png",
+      "boot-foot0-E1-0.4125-swing.png",
+      "trousers-E0-0.385.png",
+      "trousers-E1-0.385.png",
+      "trousers-E0-0.4125.png",
+      "trousers-E1-0.4125.png",
     ];
     await Promise.all(
       plateNames.map(async (name) => {
@@ -608,7 +620,7 @@ export class WalkMode {
       const northCount = Object.keys(this.northPlates).length;
       const southCount = Object.keys(this.southPlates).length;
       const westCount = Object.keys(this.westPlates).length;
-      note.textContent = `东向植靴 ${PLANT_DISTANCE}，北向植靴 ${NORTH_PLANT_DISTANCE}，南向植靴 ${SOUTH_PLANT_DISTANCE}，西向植靴 ${WEST_PLANT_DISTANCE}。上身跟根。北南西步距仍是测得的 ${WALK_CYCLE_DISTANCE}。东层 ${plates}/30，北层 ${northCount}/27，南层 ${southCount}/29，西层 ${westCount}/30。不是步态终稿。`;
+      note.textContent = `东向植靴 ${PLANT_DISTANCE}，北向植靴 ${NORTH_PLANT_DISTANCE}，南向植靴 ${SOUTH_PLANT_DISTANCE}，西向植靴 ${WEST_PLANT_DISTANCE}。上身跟根。北南西步距仍是测得的 ${WALK_CYCLE_DISTANCE}。东层 ${plates}/42，北层 ${northCount}/27，南层 ${southCount}/29，西层 ${westCount}/30。不是步态终稿。`;
     } else if (note && missing.length) {
       note.textContent = `行走帧缺失：${missing.join(" ")}。缺的方向不用单张冒充迈步。`;
     }
@@ -1098,7 +1110,9 @@ export class WalkMode {
       !!this.eastPlates["trousers-E1-mid.png"] &&
       !!this.eastPlates["trousers-E0-0.110.png"] &&
       !!this.eastPlates["trousers-E0-0.330.png"] &&
-      Object.keys(this.eastPlates).length >= 30
+      !!this.eastPlates["trousers-E0-0.385.png"] &&
+      !!this.eastPlates["trousers-E0-0.4125.png"] &&
+      Object.keys(this.eastPlates).length >= 42
     );
   }
 

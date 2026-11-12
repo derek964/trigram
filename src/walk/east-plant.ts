@@ -32,17 +32,23 @@ export type PlantPoseId =
   | "E0-0.110"
   | "E0-mid"
   | "E0-0.330"
+  | "E0-0.385"
+  | "E0-0.4125"
   | "source0-trailing"
   | "source1-entry"
   | "E1-0.110"
   | "E1-mid"
   | "E1-0.330"
+  | "E1-0.385"
+  | "E1-0.4125"
   | "source1-trailing";
 /** Windows of one 0.440 plant. Not the 1.024 cycle and not the 0.256 plants. */
 export const EAST_ENTRY_END = 0.055;
 export const EAST_110_END = 0.165;
 export const EAST_220_END = 0.275;
 export const EAST_330_END = 0.385;
+export const EAST_385_END = 0.4;
+export const EAST_4125_END = 0.425;
 
 export interface PlantBoot {
   file: string;
@@ -101,6 +107,22 @@ const POSES: Record<PlantPoseId, PlantPose> = {
       { file: "boot-foot0-E0-0.330.png", foot: 0, sole: { x: 232.5, y: 584 }, latched: true, role: "support" },
     ],
   },
+  "E0-0.385": {
+    id: "E0-0.385",
+    trousers: "trousers-E0-0.385.png",
+    boots: [
+      { file: "boot-foot1-E0-0.385-swing.png", foot: 1, sole: { x: 319, y: 547 }, latched: false, role: "swing" },
+      { file: "boot-foot0-E0-0.385.png", foot: 0, sole: { x: 218.5, y: 577 }, latched: true, role: "support" },
+    ],
+  },
+  "E0-0.4125": {
+    id: "E0-0.4125",
+    trousers: "trousers-E0-0.4125.png",
+    boots: [
+      { file: "boot-foot1-E0-0.4125-swing.png", foot: 1, sole: { x: 327, y: 545 }, latched: false, role: "swing" },
+      { file: "boot-foot0-E0-0.4125.png", foot: 0, sole: { x: 211.5, y: 574 }, latched: true, role: "support" },
+    ],
+  },
   "source0-trailing": {
     id: "source0-trailing",
     trousers: "east-source0-trailing-trousers.png",
@@ -139,6 +161,22 @@ const POSES: Record<PlantPoseId, PlantPose> = {
     boots: [
       { file: "boot-foot0-E1-0.330-swing.png", foot: 0, sole: { x: 302, y: 550 }, latched: false, role: "swing" },
       { file: "boot-foot1-E1-0.330.png", foot: 1, sole: { x: 232.5, y: 584 }, latched: true, role: "support" },
+    ],
+  },
+  "E1-0.385": {
+    id: "E1-0.385",
+    trousers: "trousers-E1-0.385.png",
+    boots: [
+      { file: "boot-foot0-E1-0.385-swing.png", foot: 0, sole: { x: 319, y: 547 }, latched: false, role: "swing" },
+      { file: "boot-foot1-E1-0.385.png", foot: 1, sole: { x: 219.5, y: 577 }, latched: true, role: "support" },
+    ],
+  },
+  "E1-0.4125": {
+    id: "E1-0.4125",
+    trousers: "trousers-E1-0.4125.png",
+    boots: [
+      { file: "boot-foot0-E1-0.4125-swing.png", foot: 0, sole: { x: 327, y: 545 }, latched: false, role: "swing" },
+      { file: "boot-foot1-E1-0.4125.png", foot: 1, sole: { x: 212.5, y: 574 }, latched: true, role: "support" },
     ],
   },
   "source1-trailing": {
@@ -205,7 +243,11 @@ export function poseFor(foot: PlantFoot, local: number): PlantPose {
           ? "E0-mid"
           : local < EAST_330_END
             ? "E0-0.330"
-            : "source0-trailing"
+            : local < EAST_385_END
+              ? "E0-0.385"
+              : local < EAST_4125_END
+                ? "E0-0.4125"
+                : "source0-trailing"
     : local < EAST_ENTRY_END
       ? "source1-entry"
       : local < EAST_110_END
@@ -214,7 +256,11 @@ export function poseFor(foot: PlantFoot, local: number): PlantPose {
           ? "E1-mid"
           : local < EAST_330_END
             ? "E1-0.330"
-            : "source1-trailing";
+            : local < EAST_385_END
+              ? "E1-0.385"
+              : local < EAST_4125_END
+                ? "E1-0.4125"
+                : "source1-trailing";
   return POSES[id];
 }
 
@@ -225,9 +271,13 @@ export function eastHudToken(foot: PlantFoot, local: number): string {
   if (pose.id === "E0-0.110") return `E011${text}`;
   if (pose.id === "E0-mid") return `E01${text}`;
   if (pose.id === "E0-0.330") return `E033${text}`;
+  if (pose.id === "E0-0.385") return `E038${text}`;
+  if (pose.id === "E0-0.4125") return `E041${text}`;
   if (pose.id === "E1-0.110") return `E111${text}`;
   if (pose.id === "E1-mid") return `E1${text}`;
   if (pose.id === "E1-0.330") return `E133${text}`;
+  if (pose.id === "E1-0.385") return `E138${text}`;
+  if (pose.id === "E1-0.4125") return `E141${text}`;
   return `${foot}${pose.id.endsWith("trailing") ? "后" : "入"}${text}`;
 }
 
