@@ -64,6 +64,18 @@ import {
 } from "./west-plant";
 import { cardinalFromFacing, type Cardinal } from "./paper-hunter";
 import {
+  DRAW_ID_CELL,
+  DRAW_ID_X,
+  DRAW_ID_Y,
+  EVIDENCE_FIDUCIALS,
+  EVIDENCE_LOG_CAP,
+  type EvidenceBoot,
+  type EvidenceRow,
+  assembleEvidenceRow,
+  drawIdPattern,
+  evidenceEnabled,
+} from "./evidence";
+import {
   HUNTER_BODY_SCALE,
   WALL_RAISE_SCALE,
   WALK_ANCHOR_X,
@@ -252,6 +264,11 @@ export class WalkMode {
   private southPlates: Record<string, Img> = {};
   private westPlates: Record<string, Img> = {};
   private plantLog: PlantSample[] = [];
+  private evidenceWanted = false;
+  private evidenceLog: EvidenceRow[] = [];
+  private evidenceNextId = 1;
+  private evidenceDropped = 0;
+  private evidenceEastDrawn: { poseId: string; boots: EvidenceBoot[] } | null = null;
 
   constructor() {
     this.root = document.createElement("section");
@@ -269,6 +286,7 @@ export class WalkMode {
     document.querySelector("#app")?.appendChild(this.root);
     this.bind();
     this.settleWanted = new URLSearchParams(location.search).get("settle") === "1";
+    this.evidenceWanted = evidenceEnabled(location.search);
     void this.loadArt();
   }
 
@@ -289,12 +307,22 @@ export class WalkMode {
     this.westPlant = null;
     this.frozenWalk = null;
     this.plantLog = [];
+    this.evidenceLog = [];
+    this.evidenceDropped = 0;
     this.win.classList.add("hidden");
     this.status.textContent = "沿走廊走到绿旗";
   }
 
   getPlantLog(): PlantSample[] {
     return this.plantLog;
+  }
+
+  getEvidenceLog(): EvidenceRow[] {
+    return this.evidenceLog;
+  }
+
+  getEvidenceStatus(): { count: number; dropped: number; nextDrawId: number } {
+    return { count: this.evidenceLog.length, dropped: this.evidenceDropped, nextDrawId: this.evidenceNextId };
   }
 
   getCamera(): { back: number; eye: number; look: number; ahead: number; fov: number; aspect: number } {
@@ -823,6 +851,7 @@ export class WalkMode {
     const w = this.canvas.width;
     const h = this.canvas.height;
     if (w < 2 || h < 2) return;
+    if (this.evidenceWanted) this.evidenceEastDrawn = null;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = true;
     ctx.fillStyle = "#e7d8c4";
@@ -888,6 +917,77 @@ export class WalkMode {
     }
     if (-distanceTo(GOAL.x, 0.2, GOAL.y, cam) > playerDepth) this.drawFlag(cam);
     ctx.restore();
+    if (this.evidenceWanted) this.commitEvidence(cam);
+  }
+
+  /** Floor marks at fixed world coordinates, projected with this draw's camera. */
+  private drawEvidenceFiducials(c: number, r: number, cam: TpsCamera): void {
+    const s = 0.045;
+    for (const mark of EVIDENCE_FIDUCIALS) {
+      if (Math.floor(mark.x) !== c || Math.floor(mark.y) !== r) continue;
+      this.quad(cam, [
+        { e: mark.x - s, u: 0.012, s: mark.y - s },
+        { e: mark.x + s, u: 0.012, s: mark.y - s },
+        { e: mark.x + s, u: 0.012, s: mark.y + s },
+        { e: mark.x - s, u: 0.012, s: mark.y + s },
+      ], "#143d3a");
+    }
+  }
+
+  /** One row for this draw, then that same id painted on this canvas. */
+  private commitEvidence(cam: TpsCamera): void {
+    const id = this.evidenceNextId;
+    this.evidenceNextId += 1;
+    if (this.evidenceLog.length >= EVIDENCE_LOG_CAP) {
+      this.evidenceDropped += 1;
+      this.paintDrawId(id);
+      return;
+    }
+    const held = [...this.held].sort();
+    const plant = this.eastPlant;
+    this.evidenceLog.push(assembleEvidenceRow(id, {
+      input: held,
+      root: { x: this.walker.x, y: this.walker.y },
+      phase: this.walker.phase,
+      moving: this.walker.moving,
+      facing: cardinalFromFacing(this.walker.facing),
+      blocked: held.length > 0 && !this.walker.moving && !this.walker.won,
+      plantFrozen: !this.walker.moving && !!(this.eastPlant || this.northPlant || this.southPlant || this.westPlant),
+      hudAtDraw: document.getElementById("walk-input")?.textContent ?? "",
+      eastPlant: plant ? { originX: plant.originX, originY: plant.originY, foot: plant.foot, local: plant.local } : null,
+      eastDrawn: this.evidenceEastDrawn,
+      camera: {
+        back: cam.back,
+        eye: { x: cam.eye.x, y: cam.eye.y, z: cam.eye.z },
+        look: { x: cam.look.x, y: cam.look.y, z: cam.look.z },
+        forward: { x: cam.forward.x, y: cam.forward.y, z: cam.forward.z },
+        right: { x: cam.right.x, y: cam.right.y, z: cam.right.z },
+        up: { x: cam.up.x, y: cam.up.y, z: cam.up.z },
+        fovY: cam.fovY,
+        aspect: cam.aspect,
+        view: { x: cam.view.x, y: cam.view.y, w: cam.view.w, h: cam.view.h },
+      },
+      fiducials: EVIDENCE_FIDUCIALS.map((mark) => {
+        const projected = projectGround(mark.x, mark.y, cam);
+        return { id: mark.id, world: { x: mark.x, y: mark.y }, projected: projected ? { x: projected.x, y: projected.y } : null };
+      }),
+    }));
+    this.paintDrawId(id);
+  }
+
+  private paintDrawId(id: number): void {
+    const bits = drawIdPattern(id);
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(DRAW_ID_X - 2, DRAW_ID_Y - 2, bits.length * DRAW_ID_CELL + 4, DRAW_ID_CELL + 4);
+    bits.forEach((on, i) => {
+      ctx.fillStyle = on ? "#000000" : "#ffffff";
+      ctx.fillRect(DRAW_ID_X + i * DRAW_ID_CELL, DRAW_ID_Y, DRAW_ID_CELL, DRAW_ID_CELL);
+    });
+    ctx.restore();
   }
 
   private wallHull(c: number, r: number, cam: TpsCamera): { x: number; y: number }[] {
@@ -911,6 +1011,7 @@ export class WalkMode {
       { e: c + 1, u: 0, s: r + 1 },
       { e: c, u: 0, s: r + 1 },
     ], shade);
+    if (this.evidenceWanted) this.drawEvidenceFiducials(c, r, cam);
     if (!this.grass.length || ((c * 5 + r * 9) & 3) !== 0 || (c === START.c && r === START.r) || (c === GOAL.c && r === GOAL.r)) return;
     const g = this.grass[(c + r) % this.grass.length];
     const at = projectGround(c + 0.5, r + 0.72, cam);
@@ -1136,15 +1237,31 @@ export class WalkMode {
     };
     atRoot(shaft);
     const origin = { x: plant.originX, y: plant.originY };
+    const recorded: EvidenceBoot[] | null = this.evidenceWanted ? [] : null;
     for (const boot of pose.boots) {
       const img = this.eastPlates[boot.file];
       if (!img) return;
       const screen = this.bootScreen(boot, origin, feetX, feetY, px);
       this.ctx.drawImage(img, screen.drawX, screen.drawY, WALK_FRAME_W * px, WALK_FRAME_H * px);
       this.noteSole(pose.id, boot, screen, px);
+      if (recorded) {
+        const delta = screen.latch ? Math.hypot(screen.sole.x - screen.latch.x, screen.sole.y - screen.latch.y) : null;
+        const rootDelta = screen.latch ? Math.hypot(screen.rootSole.x - screen.latch.x, screen.rootSole.y - screen.latch.y) : null;
+        recorded.push({
+          role: boot.role,
+          foot: boot.foot,
+          latched: boot.latched,
+          soleArt: { x: boot.sole.x, y: boot.sole.y },
+          latchWorld: screen.latchWorld ? { x: screen.latchWorld.x, y: screen.latchWorld.y } : null,
+          projectedSole: { x: screen.sole.x, y: screen.sole.y },
+          projectedDeltaPx: delta,
+          projectedArtDelta: rootDelta != null && px ? rootDelta / px : null,
+        });
+      }
     }
     atRoot(trousers);
     atRoot(upper);
+    if (recorded) this.evidenceEastDrawn = { poseId: pose.id, boots: recorded };
   }
 
   private northPlatesReady(): boolean {
