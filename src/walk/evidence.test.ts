@@ -5,10 +5,13 @@ import { poseFor } from "./east-plant";
 import { createWalker, stepWalker } from "./motion";
 import {
   DRAW_ID_BITS,
+  CONTACT_RADIUS,
+  CONTACT_UP,
   EVIDENCE_FIDUCIALS,
   FIDUCIAL_UP,
   assembleEvidenceRow,
   classifyFiducial,
+  contactPoints,
   decodeDrawId,
   drawIdPattern,
   evidenceEnabled,
@@ -36,6 +39,7 @@ test("a draw id painted as bits decodes to that same row", () => {
       blocked: false,
       plantFrozen: false,
       hudAtDraw: "走",
+      rafMs: 16.7,
       eastPlant: { originX: 2.82, originY: 1.5, foot: 1, local: 0.11 },
       eastDrawn: {
         poseId: "E1-0.110",
@@ -70,6 +74,7 @@ test("a draw id painted as bits decodes to that same row", () => {
         measuredPixels: null,
         visibility: "in-view",
       }],
+      contactControls: [],
     });
     assert.equal(row.drawId, decodeDrawId(drawIdPattern(row.drawId)));
     assert.equal(row.eastDrawn?.poseId, "E1-0.110");
@@ -89,22 +94,24 @@ test("recording a draw does not change the walker, and a real step can skip 0.38
     facing: "E",
     blocked: false,
     plantFrozen: false,
-    hudAtDraw: "",
-    eastPlant: null,
-    eastDrawn: null,
-    camera: {
-      back: 1.7,
-      eye: { x: 0, y: 0, z: 0 },
-      look: { x: 0, y: 0, z: 0 },
-      forward: { x: 1, y: 0, z: 0 },
-      right: { x: 0, y: 0, z: 1 },
-      up: { x: 0, y: 1, z: 0 },
-      fovY: 0.9,
-      aspect: 0.8,
-      view: { x: 0, y: 0, w: 1, h: 1 },
-    },
-    fiducials: [],
-  });
+      hudAtDraw: "",
+      rafMs: 0,
+      eastPlant: null,
+      eastDrawn: null,
+      camera: {
+        back: 1.7,
+        eye: { x: 0, y: 0, z: 0 },
+        look: { x: 0, y: 0, z: 0 },
+        forward: { x: 1, y: 0, z: 0 },
+        right: { x: 0, y: 0, z: 1 },
+        up: { x: 0, y: 1, z: 0 },
+        fovY: 0.9,
+        aspect: 0.8,
+        view: { x: 0, y: 0, w: 1, h: 1 },
+      },
+      fiducials: [],
+      contactControls: [],
+    });
   assert.equal(JSON.stringify(walker), before);
   const stick = { x: 1, y: 0 };
   let plain = createWalker();
@@ -121,6 +128,7 @@ test("recording a draw does not change the walker, and a real step can skip 0.38
       blocked: false,
       plantFrozen: false,
       hudAtDraw: "",
+      rafMs: i,
       eastPlant: null,
       eastDrawn: null,
       camera: {
@@ -135,6 +143,7 @@ test("recording a draw does not change the walker, and a real step can skip 0.38
         view: { x: 0, y: 0, w: 1, h: 1 },
       },
       fiducials: [],
+      contactControls: [],
     });
   }
   assert.deepEqual(logged, plain);
@@ -153,4 +162,15 @@ test("recording a draw does not change the walker, and a real step can skip 0.38
     assert.ok(mark.z > 1 && mark.z < 2);
   }
   assert.equal(FIDUCIAL_UP, 0.012);
+  const latch = { x: 2.597, y: 1.483 };
+  const points = contactPoints(latch);
+  const center = points.find((point) => point.id === "C");
+  assert.equal(center?.role, "center");
+  assert.deepEqual(center?.world, { x: latch.x, y: CONTACT_UP, z: latch.y });
+  for (const point of points.filter((item) => item.role === "surround")) {
+    const dx = point.world.x - latch.x;
+    const dz = point.world.z - latch.y;
+    assert.ok(Math.abs(Math.hypot(dx, dz) - CONTACT_RADIUS) < 1e-9);
+    assert.equal(point.world.y, 0);
+  }
 });

@@ -67,11 +67,13 @@ import {
   DRAW_ID_CELL,
   DRAW_ID_X,
   DRAW_ID_Y,
+  CONTACT_HALF,
   EVIDENCE_FIDUCIALS,
   EVIDENCE_LOG_CAP,
   FIDUCIAL_HALF,
   FIDUCIAL_UP,
   classifyFiducial,
+  contactPoints,
   type EvidenceBoot,
   type EvidenceRow,
   assembleEvidenceRow,
@@ -272,6 +274,8 @@ export class WalkMode {
   private evidenceNextId = 1;
   private evidenceDropped = 0;
   private evidenceEastDrawn: { poseId: string; boots: EvidenceBoot[] } | null = null;
+  private evidenceRafMs = 0;
+  private inputObs: { type: string; key: string; timeStamp: number; perf: number }[] = [];
 
   constructor() {
     this.root = document.createElement("section");
@@ -287,9 +291,9 @@ export class WalkMode {
     this.win = document.createElement("div");
     this.build();
     document.querySelector("#app")?.appendChild(this.root);
-    this.bind();
     this.settleWanted = new URLSearchParams(location.search).get("settle") === "1";
     this.evidenceWanted = evidenceEnabled(location.search);
+    this.bind();
     void this.loadArt();
   }
 
@@ -322,6 +326,10 @@ export class WalkMode {
 
   getEvidenceLog(): EvidenceRow[] {
     return this.evidenceLog;
+  }
+
+  getInputObs(): { type: string; key: string; timeStamp: number; perf: number }[] {
+    return this.inputObs;
   }
 
   getEvidenceStatus(): { count: number; dropped: number; nextDrawId: number } {
@@ -447,6 +455,14 @@ export class WalkMode {
       const dir = KEYS[e.key];
       if (dir) this.held.delete(dir);
     });
+    if (this.evidenceWanted) {
+      const note = (e: KeyboardEvent) => {
+        if (e.repeat) return;
+        this.inputObs.push({ type: e.type, key: e.key, timeStamp: e.timeStamp, perf: performance.now() });
+      };
+      window.addEventListener("keydown", note, true);
+      window.addEventListener("keyup", note, true);
+    }
     window.addEventListener("blur", () => this.held.clear());
     window.addEventListener("resize", () => this.resize());
     if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => this.resize()).observe(this.canvas);
@@ -786,6 +802,7 @@ export class WalkMode {
   private loop = (t: number): void => {
     const dt = this.last ? Math.min(0.05, (t - this.last) / 1000) : 0;
     this.last = t;
+    if (this.evidenceWanted) this.evidenceRafMs = t;
     if (this.active) {
       const prev = this.walker;
       this.walker = stepWalker(this.walker, this.stick(), dt || 0);
@@ -903,6 +920,7 @@ export class WalkMode {
     const behind = walls.filter((cell) => cell.depth <= playerDepth).sort((a, b) => a.depth - b.depth);
     for (const cell of behind) paint(cell);
     if (-distanceTo(GOAL.x, 0.2, GOAL.y, cam) <= playerDepth) this.drawFlag(cam);
+    if (this.evidenceWanted) this.drawContactMarks(cam);
     this.drawHunter(feetX, feetY, bodyH);
     const front = walls.filter((cell) => cell.depth > playerDepth).sort((a, b) => a.depth - b.depth);
     for (const cell of front) {
@@ -937,6 +955,48 @@ export class WalkMode {
     }
   }
 
+  /**
+   * Floor quads at the support latch and 0.09 around it. Drawn after the floor
+   * and before the body, at up = 0. The body can cover the center.
+   */
+  private drawContactMarks(cam: TpsCamera): void {
+    const plant = this.eastPlant;
+    if (!plant) return;
+    const support = poseFor(plant.foot, plant.local).boots.find((boot) => boot.role === "support" && boot.latched);
+    if (!support) return;
+    const latch = latchWorld({ x: plant.originX, y: plant.originY }, plant.foot, "support");
+    const s = CONTACT_HALF;
+    const color: Record<string, string> = { C: "#2040e0", E: "#00a0a0", W: "#c00070", N: "#d0a000", S: "#30a030" };
+    for (const mark of contactPoints(latch)) {
+      this.quad(cam, [
+        { e: mark.world.x - s, u: 0, s: mark.world.z - s },
+        { e: mark.world.x + s, u: 0, s: mark.world.z - s },
+        { e: mark.world.x + s, u: 0, s: mark.world.z + s },
+        { e: mark.world.x - s, u: 0, s: mark.world.z + s },
+      ], color[mark.id] ?? "#2040e0");
+    }
+  }
+
+  private contactRecords(cam: TpsCamera): EvidenceRow["contactControls"] {
+    const plant = this.eastPlant;
+    if (!plant) return [];
+    const support = poseFor(plant.foot, plant.local).boots.find((boot) => boot.role === "support" && boot.latched);
+    if (!support) return [];
+    const latch = latchWorld({ x: plant.originX, y: plant.originY }, plant.foot, "support");
+    return contactPoints(latch).map((mark) => {
+      const predicted = projectTps(mark.world.x, mark.world.y, mark.world.z, cam);
+      const occluded = this.fiducialOccluded(cam, mark.world.x, mark.world.z);
+      return {
+        id: mark.id,
+        role: mark.role,
+        world: mark.world,
+        predictedProjection: predicted ? { x: predicted.x, y: predicted.y } : null,
+        measuredPixels: null,
+        visibility: classifyFiducial(predicted, cam.view, occluded),
+      };
+    });
+  }
+
   /** A wall cell between the eye and the mark. The mark's own open cell is not a hit. */
   private fiducialOccluded(cam: TpsCamera, east: number, south: number): boolean {
     const steps = 8;
@@ -969,6 +1029,7 @@ export class WalkMode {
       blocked: held.length > 0 && !this.walker.moving && !this.walker.won,
       plantFrozen: !this.walker.moving && !!(this.eastPlant || this.northPlant || this.southPlant || this.westPlant),
       hudAtDraw: document.getElementById("walk-input")?.textContent ?? "",
+      rafMs: this.evidenceRafMs,
       eastPlant: plant ? { originX: plant.originX, originY: plant.originY, foot: plant.foot, local: plant.local } : null,
       eastDrawn: this.evidenceEastDrawn,
       camera: {
@@ -993,6 +1054,7 @@ export class WalkMode {
           visibility: classifyFiducial(predicted, cam.view, occluded),
         };
       }),
+      contactControls: this.contactRecords(cam),
     }));
     this.paintDrawId(id);
   }

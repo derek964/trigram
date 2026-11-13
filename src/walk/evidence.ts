@@ -37,6 +37,26 @@ export const EVIDENCE_FIDUCIALS = [
   { id: "F2", x: 3.88, z: 1.58 },
 ] as const;
 
+/** Contact controls sit on the floor (up = 0), around the support latch. Evidence only. */
+export const CONTACT_UP = 0;
+export const CONTACT_HALF = 0.016;
+export const CONTACT_RADIUS = 0.09;
+export const CONTACT_OFFSETS = [
+  { id: "C", east: 0, south: 0 },
+  { id: "E", east: CONTACT_RADIUS, south: 0 },
+  { id: "W", east: -CONTACT_RADIUS, south: 0 },
+  { id: "N", east: 0, south: -CONTACT_RADIUS },
+  { id: "S", east: 0, south: CONTACT_RADIUS },
+] as const;
+
+export function contactPoints(latch: { x: number; y: number }): { id: string; role: "center" | "surround"; world: { x: number; y: number; z: number } }[] {
+  return CONTACT_OFFSETS.map((offset) => ({
+    id: offset.id,
+    role: offset.id === "C" ? "center" : "surround",
+    world: { x: latch.x + offset.east, y: CONTACT_UP, z: latch.y + offset.south },
+  }));
+}
+
 export type FiducialVisibility = "in-view" | "offscreen" | "behind-camera" | "occluded";
 
 export function classifyFiducial(
@@ -98,6 +118,8 @@ export interface EvidenceRow {
   blocked: boolean;
   plantFrozen: boolean;
   hudAtDraw: string;
+  /** requestAnimationFrame timestamp for this step, in the page performance clock. */
+  rafMs: number;
   eastPlant: { originX: number; originY: number; foot: 0 | 1; local: number } | null;
   eastDrawn: { poseId: string; boots: EvidenceBoot[] } | null;
   camera: {
@@ -116,6 +138,15 @@ export interface EvidenceRow {
     /** Center of the drawn quad. y is up and matches FIDUCIAL_UP. z is south. */
     world: { x: number; y: number; z: number };
     /** Camera projection of that center. Not a framebuffer sample. */
+    predictedProjection: { x: number; y: number } | null;
+    measuredPixels: null;
+    visibility: FiducialVisibility;
+  }[];
+  /** Floor marks around the current support latch. Empty when there is no east support. */
+  contactControls: {
+    id: string;
+    role: "center" | "surround";
+    world: { x: number; y: number; z: number };
     predictedProjection: { x: number; y: number } | null;
     measuredPixels: null;
     visibility: FiducialVisibility;
