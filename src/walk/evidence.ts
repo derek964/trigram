@@ -14,13 +14,39 @@ export const DRAW_ID_CELL = 8;
 export const DRAW_ID_X = 12;
 export const DRAW_ID_Y = 12;
 export const DRAW_ID_BITS = 20;
+/** Height of the drawn mark. The row projects this same center, not the floor at 0. */
+export const FIDUCIAL_UP = 0.012;
+export const FIDUCIAL_HALF = 0.028;
 
-/** Fixed floor points in the east corridor. World x is east, y is south. */
+/**
+ * Fixed points in the east corridor, off the y=1.5 walk line so they stay
+ * beside the boots. x is east, z is south. They do not follow the actor.
+ */
 export const EVIDENCE_FIDUCIALS = [
-  { id: "A", x: 1.72, y: 1.28 },
-  { id: "B", x: 2.4, y: 1.78 },
-  { id: "C", x: 3.2, y: 1.22 },
+  { id: "A1", x: 1.85, z: 1.32 },
+  { id: "A2", x: 1.85, z: 1.68 },
+  { id: "B1", x: 2.3, z: 1.32 },
+  { id: "B2", x: 2.3, z: 1.68 },
+  { id: "C1", x: 2.75, z: 1.32 },
+  { id: "C2", x: 2.75, z: 1.68 },
+  { id: "D1", x: 3.2, z: 1.32 },
+  { id: "D2", x: 3.2, z: 1.68 },
+  { id: "E1", x: 3.55, z: 1.32 },
+  { id: "E2", x: 3.55, z: 1.68 },
 ] as const;
+
+export type FiducialVisibility = "in-view" | "offscreen" | "behind-camera" | "occluded";
+
+export function classifyFiducial(
+  predicted: { x: number; y: number } | null,
+  view: { x: number; y: number; w: number; h: number },
+  occluded: boolean,
+): FiducialVisibility {
+  if (!predicted) return "behind-camera";
+  if (predicted.x < view.x || predicted.y < view.y || predicted.x > view.x + view.w || predicted.y > view.y + view.h) return "offscreen";
+  if (occluded) return "occluded";
+  return "in-view";
+}
 
 export function evidenceEnabled(search: string): boolean {
   return new URLSearchParams(search).get("evidence") === "1";
@@ -83,7 +109,15 @@ export interface EvidenceRow {
     aspect: number;
     view: { x: number; y: number; w: number; h: number };
   };
-  fiducials: { id: string; world: { x: number; y: number }; projected: { x: number; y: number } | null }[];
+  fiducials: {
+    id: string;
+    /** Center of the drawn quad. y is up and matches FIDUCIAL_UP. z is south. */
+    world: { x: number; y: number; z: number };
+    /** Camera projection of that center. Not a framebuffer sample. */
+    predictedProjection: { x: number; y: number } | null;
+    measuredPixels: null;
+    visibility: FiducialVisibility;
+  }[];
   projectedNotPixel: true;
 }
 

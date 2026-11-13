@@ -69,6 +69,9 @@ import {
   DRAW_ID_Y,
   EVIDENCE_FIDUCIALS,
   EVIDENCE_LOG_CAP,
+  FIDUCIAL_HALF,
+  FIDUCIAL_UP,
+  classifyFiducial,
   type EvidenceBoot,
   type EvidenceRow,
   assembleEvidenceRow,
@@ -922,16 +925,28 @@ export class WalkMode {
 
   /** Floor marks at fixed world coordinates, projected with this draw's camera. */
   private drawEvidenceFiducials(c: number, r: number, cam: TpsCamera): void {
-    const s = 0.045;
+    const s = FIDUCIAL_HALF;
     for (const mark of EVIDENCE_FIDUCIALS) {
-      if (Math.floor(mark.x) !== c || Math.floor(mark.y) !== r) continue;
+      if (Math.floor(mark.x) !== c || Math.floor(mark.z) !== r) continue;
       this.quad(cam, [
-        { e: mark.x - s, u: 0.012, s: mark.y - s },
-        { e: mark.x + s, u: 0.012, s: mark.y - s },
-        { e: mark.x + s, u: 0.012, s: mark.y + s },
-        { e: mark.x - s, u: 0.012, s: mark.y + s },
-      ], "#143d3a");
+        { e: mark.x - s, u: FIDUCIAL_UP, s: mark.z - s },
+        { e: mark.x + s, u: FIDUCIAL_UP, s: mark.z - s },
+        { e: mark.x + s, u: FIDUCIAL_UP, s: mark.z + s },
+        { e: mark.x - s, u: FIDUCIAL_UP, s: mark.z + s },
+      ], mark.id.endsWith("1") ? "#143d3a" : "#6b2d2d");
     }
+  }
+
+  /** A wall cell between the eye and the mark. The mark's own open cell is not a hit. */
+  private fiducialOccluded(cam: TpsCamera, east: number, south: number): boolean {
+    const steps = 8;
+    for (let i = 1; i < steps; i++) {
+      const t = i / steps;
+      const x = cam.eye.x + (east - cam.eye.x) * t;
+      const z = cam.eye.z + (south - cam.eye.z) * t;
+      if (isWall(MAZE_GRID, Math.floor(x), Math.floor(z))) return true;
+    }
+    return false;
   }
 
   /** One row for this draw, then that same id painted on this canvas. */
@@ -968,8 +983,15 @@ export class WalkMode {
         view: { x: cam.view.x, y: cam.view.y, w: cam.view.w, h: cam.view.h },
       },
       fiducials: EVIDENCE_FIDUCIALS.map((mark) => {
-        const projected = projectGround(mark.x, mark.y, cam);
-        return { id: mark.id, world: { x: mark.x, y: mark.y }, projected: projected ? { x: projected.x, y: projected.y } : null };
+        const predicted = projectTps(mark.x, FIDUCIAL_UP, mark.z, cam);
+        const occluded = this.fiducialOccluded(cam, mark.x, mark.z);
+        return {
+          id: mark.id,
+          world: { x: mark.x, y: FIDUCIAL_UP, z: mark.z },
+          predictedProjection: predicted ? { x: predicted.x, y: predicted.y } : null,
+          measuredPixels: null,
+          visibility: classifyFiducial(predicted, cam.view, occluded),
+        };
       }),
     }));
     this.paintDrawId(id);

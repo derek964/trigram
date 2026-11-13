@@ -5,7 +5,10 @@ import { poseFor } from "./east-plant";
 import { createWalker, stepWalker } from "./motion";
 import {
   DRAW_ID_BITS,
+  EVIDENCE_FIDUCIALS,
+  FIDUCIAL_UP,
   assembleEvidenceRow,
+  classifyFiducial,
   decodeDrawId,
   drawIdPattern,
   evidenceEnabled,
@@ -60,7 +63,13 @@ test("a draw id painted as bits decodes to that same row", () => {
         aspect: 0.8,
         view: { x: 0, y: 0, w: 10, h: 10 },
       },
-      fiducials: [{ id: "A", world: { x: 1.72, y: 1.28 }, projected: { x: 4, y: 5 } }],
+      fiducials: [{
+        id: "A1",
+        world: { x: 1.85, y: 0.012, z: 1.32 },
+        predictedProjection: { x: 4, y: 5 },
+        measuredPixels: null,
+        visibility: "in-view",
+      }],
     });
     assert.equal(row.drawId, decodeDrawId(drawIdPattern(row.drawId)));
     assert.equal(row.eastDrawn?.poseId, "E1-0.110");
@@ -134,4 +143,10 @@ test("recording a draw does not change the walker, and a real step can skip 0.38
   assert.equal(poseFor(0, from).id, "E0-0.330");
   assert.equal(poseFor(0, from + step).id, "E0-0.4125");
   assert.equal(poseFor(0, 0.39).id, "E0-0.385");
+  assert.equal(classifyFiducial(null, { x: 0, y: 0, w: 10, h: 10 }, false), "behind-camera");
+  assert.equal(classifyFiducial({ x: 20, y: 5 }, { x: 0, y: 0, w: 10, h: 10 }, false), "offscreen");
+  assert.equal(classifyFiducial({ x: 5, y: 5 }, { x: 0, y: 0, w: 10, h: 10 }, true), "occluded");
+  assert.ok(EVIDENCE_FIDUCIALS.length >= 8);
+  for (const mark of EVIDENCE_FIDUCIALS) assert.ok(Math.abs(mark.z - 1.5) >= 0.1);
+  assert.equal(FIDUCIAL_UP, 0.012);
 });
