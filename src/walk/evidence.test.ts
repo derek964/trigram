@@ -146,7 +146,11 @@ test("recording a draw does not change the walker, and a real step can skip 0.38
   assert.equal(classifyFiducial(null, { x: 0, y: 0, w: 10, h: 10 }, false), "behind-camera");
   assert.equal(classifyFiducial({ x: 20, y: 5 }, { x: 0, y: 0, w: 10, h: 10 }, false), "offscreen");
   assert.equal(classifyFiducial({ x: 5, y: 5 }, { x: 0, y: 0, w: 10, h: 10 }, true), "occluded");
-  assert.ok(EVIDENCE_FIDUCIALS.length >= 8);
-  for (const mark of EVIDENCE_FIDUCIALS) assert.ok(Math.abs(mark.z - 1.5) >= 0.1);
+  assert.ok(EVIDENCE_FIDUCIALS.length >= 10);
+  for (const mark of EVIDENCE_FIDUCIALS) {
+    assert.ok(Math.abs(mark.z - 1.5) >= 0.08);
+    assert.ok(mark.x > 1 && mark.x < 4);
+    assert.ok(mark.z > 1 && mark.z < 2);
+  }
   assert.equal(FIDUCIAL_UP, 0.012);
 });

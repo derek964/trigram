@@ -33,6 +33,8 @@ export const EVIDENCE_FIDUCIALS = [
   { id: "D2", x: 3.2, z: 1.68 },
   { id: "E1", x: 3.55, z: 1.32 },
   { id: "E2", x: 3.55, z: 1.68 },
+  { id: "F1", x: 3.88, z: 1.42 },
+  { id: "F2", x: 3.88, z: 1.58 },
 ] as const;
 
 export type FiducialVisibility = "in-view" | "offscreen" | "behind-camera" | "occluded";
