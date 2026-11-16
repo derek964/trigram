@@ -543,6 +543,12 @@ export class WalkMode {
       "trousers-E1-0.385.png",
       "trousers-E0-0.4125.png",
       "trousers-E1-0.4125.png",
+      "c-refined-20261116/E0-C1-refined-static-transition.png",
+      "c-refined-20261116/E0-C2-refined-static-transition.png",
+      "c-refined-20261116/E0-C3-refined-static-transition.png",
+      "c-refined-20261116/E1-C1-refined-static-transition.png",
+      "c-refined-20261116/E1-C2-refined-static-transition.png",
+      "c-refined-20261116/E1-C3-refined-static-transition.png",
     ];
     await Promise.all(
       plateNames.map(async (name) => {
@@ -1297,7 +1303,9 @@ export class WalkMode {
       !!this.eastPlates["trousers-E0-0.330.png"] &&
       !!this.eastPlates["trousers-E0-0.385.png"] &&
       !!this.eastPlates["trousers-E0-0.4125.png"] &&
-      Object.keys(this.eastPlates).length >= 42
+      !!this.eastPlates["c-refined-20261116/E0-C1-refined-static-transition.png"] &&
+      !!this.eastPlates["c-refined-20261116/E1-C3-refined-static-transition.png"] &&
+      Object.keys(this.eastPlates).length >= 48
     );
   }
 
@@ -1306,6 +1314,19 @@ export class WalkMode {
     const plant = this.eastPlant;
     if (!plant) return;
     const pose = poseFor(plant.foot, plant.local);
+    if (pose.composite) {
+      const plate = this.eastPlates[pose.composite];
+      if (!plate) return;
+      this.ctx.drawImage(
+        plate,
+        feetX - WALK_ANCHOR_X * px,
+        feetY - WALK_ANCHOR_Y * px,
+        WALK_FRAME_W * px,
+        WALK_FRAME_H * px,
+      );
+      if (this.evidenceWanted) this.evidenceEastDrawn = { poseId: pose.id, boots: [] };
+      return;
+    }
     const shaft = this.eastPlates["shared-rear-shaft.png"];
     const upper = this.eastPlates["shared-fixed-upper.png"];
     const trousers = this.eastPlates[pose.trousers];

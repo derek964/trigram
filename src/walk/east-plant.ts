@@ -29,6 +29,9 @@ export interface ArtPoint {
 export type PlantFoot = 0 | 1;
 export type PlantPoseId =
   | "source0-entry"
+  | "E0-C1"
+  | "E0-C2"
+  | "E0-C3"
   | "E0-0.110"
   | "E0-mid"
   | "E0-0.330"
@@ -36,6 +39,9 @@ export type PlantPoseId =
   | "E0-0.4125"
   | "source0-trailing"
   | "source1-entry"
+  | "E1-C1"
+  | "E1-C2"
+  | "E1-C3"
   | "E1-0.110"
   | "E1-mid"
   | "E1-0.330"
@@ -64,6 +70,12 @@ export interface PlantPose {
   trousers: string;
   /** Back to front: smaller sole y first. */
   boots: PlantBoot[];
+  /**
+   * Approved C plate, one full character. Drawn at the root instead of the
+   * layered boots. The support sole is inside this bitmap; other poses still
+   * latch through billboardBoot.
+   */
+  composite?: string;
 }
 
 export interface EastPlant {
@@ -75,6 +87,24 @@ export interface EastPlant {
 }
 
 const POSES: Record<PlantPoseId, PlantPose> = {
+  "E0-C1": {
+    id: "E0-C1",
+    trousers: "east-source0-entry-trousers.png",
+    boots: [],
+    composite: "c-refined-20261116/E0-C1-refined-static-transition.png",
+  },
+  "E0-C2": {
+    id: "E0-C2",
+    trousers: "east-source0-entry-trousers.png",
+    boots: [],
+    composite: "c-refined-20261116/E0-C2-refined-static-transition.png",
+  },
+  "E0-C3": {
+    id: "E0-C3",
+    trousers: "east-source0-entry-trousers.png",
+    boots: [],
+    composite: "c-refined-20261116/E0-C3-refined-static-transition.png",
+  },
   "source0-entry": {
     id: "source0-entry",
     trousers: "east-source0-entry-trousers.png",
@@ -130,6 +160,24 @@ const POSES: Record<PlantPoseId, PlantPose> = {
       { file: "boot-foot1-source0-trailing-swing.png", foot: 1, sole: { x: 335.5, y: 543 }, latched: false, role: "swing" },
       { file: "boot-foot0-trailing.png", foot: 0, sole: { x: 204.5, y: 570 }, latched: true, role: "support" },
     ],
+  },
+  "E1-C1": {
+    id: "E1-C1",
+    trousers: "east-source1-entry-trousers.png",
+    boots: [],
+    composite: "c-refined-20261116/E1-C1-refined-static-transition.png",
+  },
+  "E1-C2": {
+    id: "E1-C2",
+    trousers: "east-source1-entry-trousers.png",
+    boots: [],
+    composite: "c-refined-20261116/E1-C2-refined-static-transition.png",
+  },
+  "E1-C3": {
+    id: "E1-C3",
+    trousers: "east-source1-entry-trousers.png",
+    boots: [],
+    composite: "c-refined-20261116/E1-C3-refined-static-transition.png",
   },
   "source1-entry": {
     id: "source1-entry",
@@ -233,10 +281,24 @@ export function billboardBoot(
   return { drawX, drawY, sole: latchScreen, latch: latchScreen, rootSole };
 }
 
+/**
+ * C plates sit inside the existing entry interval. EAST_ENTRY_END stays 0.055.
+ * local 0 and [0.05, 0.055) stay the original entry, so the old boundary tests
+ * still name that plate. (0, 1/60) is C1, [1/60, 2/60) is C2, [2/60, 0.05) is C3.
+ * A full east step is about 0.042, which selects C3. Smaller remainders select
+ * C1 or C2. These cuts are not new travel windows.
+ */
+function refinedEntryId(foot: PlantFoot, local: number): PlantPoseId {
+  const original = foot === 0 ? "source0-entry" : "source1-entry";
+  if (local <= 0 || local >= 0.05) return original;
+  const which = local < 1 / 60 ? "C1" : local < 2 / 60 ? "C2" : "C3";
+  return `${foot === 0 ? "E0" : "E1"}-${which}` as PlantPoseId;
+}
+
 export function poseFor(foot: PlantFoot, local: number): PlantPose {
   const id = foot === 0
     ? local < EAST_ENTRY_END
-      ? "source0-entry"
+      ? refinedEntryId(0, local)
       : local < EAST_110_END
         ? "E0-0.110"
         : local < EAST_220_END
@@ -249,7 +311,7 @@ export function poseFor(foot: PlantFoot, local: number): PlantPose {
                 ? "E0-0.4125"
                 : "source0-trailing"
     : local < EAST_ENTRY_END
-      ? "source1-entry"
+      ? refinedEntryId(1, local)
       : local < EAST_110_END
         ? "E1-0.110"
         : local < EAST_220_END
@@ -268,6 +330,8 @@ export function poseFor(foot: PlantFoot, local: number): PlantPose {
 export function eastHudToken(foot: PlantFoot, local: number): string {
   const pose = poseFor(foot, local);
   const text = local.toFixed(2);
+  if (pose.id === "E0-C1" || pose.id === "E0-C2" || pose.id === "E0-C3") return `${pose.id}${text}`;
+  if (pose.id === "E1-C1" || pose.id === "E1-C2" || pose.id === "E1-C3") return `${pose.id}${text}`;
   if (pose.id === "E0-0.110") return `E011${text}`;
   if (pose.id === "E0-mid") return `E01${text}`;
   if (pose.id === "E0-0.330") return `E033${text}`;
