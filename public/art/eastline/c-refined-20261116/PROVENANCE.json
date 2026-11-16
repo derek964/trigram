@@ -1,0 +1,12 @@
+{
+  "approvedZipSha256": "16dbab1a1aa752e8050abe628f2587e3c3a9ebcb426bd18837ba38f6581c997f",
+  "note": "Six approved full-character plates. Not cuff strips and not the original entry files. Original v4 and entry paths were not overwritten.",
+  "plates": {
+    "E0-C1-refined-static-transition.png": "33d74c07f7229dd1e1233745268116212a242bb2ce36d2e73ec88ad577223591",
+    "E0-C2-refined-static-transition.png": "37d30d235684c4672b4db95b6bc4f2bb6ba686c64a695a5474121e4ec3070c9a",
+    "E0-C3-refined-static-transition.png": "6a8cc08aa7c7c2c7853047abe9f9a234f6b66fc2367f5ca459f4225e94831843",
+    "E1-C1-refined-static-transition.png": "b4646919d5f1b19374f654e235f7d41020b2ce0a446ffb722639e19438788ca0",
+    "E1-C2-refined-static-transition.png": "e0c1785b11af5e4e06c351fb5937a1a42370b6925c38dd1d04625aff4f69bfbb",
+    "E1-C3-refined-static-transition.png": "db5e343872917767a4bf8beb2524b3a8f9535217fb81e8b42e2eadfafa268f26"
+  }
+}
