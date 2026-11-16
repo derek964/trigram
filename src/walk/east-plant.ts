@@ -71,11 +71,10 @@ export interface PlantPose {
   /** Back to front: smaller sole y first. */
   boots: PlantBoot[];
   /**
-   * Approved C plate, one full character. Drawn at the root instead of the
-   * layered boots. The support sole is inside this bitmap; other poses still
-   * latch through billboardBoot.
+   * C plates are split. The support boot latches. Back and front stay on the root.
+   * `trousers` is unused for these poses; the front plate already holds the upper body.
    */
-  composite?: string;
+  anchored?: { back: string; front: string };
 }
 
 export interface EastPlant {
@@ -89,21 +88,36 @@ export interface EastPlant {
 const POSES: Record<PlantPoseId, PlantPose> = {
   "E0-C1": {
     id: "E0-C1",
-    trousers: "east-source0-entry-trousers.png",
-    boots: [],
-    composite: "c-refined-20261116/E0-C1-refined-static-transition.png",
+    trousers: "c-refined-20261116-derived/E0-C1-root-front.png",
+    boots: [
+      { file: "c-refined-20261116-derived/E0-C1-support.png", foot: 1, sole: { x: 205.5, y: 570 }, latched: true, role: "outgoing" },
+    ],
+    anchored: {
+      back: "c-refined-20261116-derived/E0-C1-root-back.png",
+      front: "c-refined-20261116-derived/E0-C1-root-front.png",
+    },
   },
   "E0-C2": {
     id: "E0-C2",
-    trousers: "east-source0-entry-trousers.png",
-    boots: [],
-    composite: "c-refined-20261116/E0-C2-refined-static-transition.png",
+    trousers: "c-refined-20261116-derived/E0-C2-root-front.png",
+    boots: [
+      { file: "c-refined-20261116-derived/E0-C2-support.png", foot: 1, sole: { x: 205.5, y: 570 }, latched: true, role: "outgoing" },
+    ],
+    anchored: {
+      back: "c-refined-20261116-derived/E0-C2-root-back.png",
+      front: "c-refined-20261116-derived/E0-C2-root-front.png",
+    },
   },
   "E0-C3": {
     id: "E0-C3",
-    trousers: "east-source0-entry-trousers.png",
-    boots: [],
-    composite: "c-refined-20261116/E0-C3-refined-static-transition.png",
+    trousers: "c-refined-20261116-derived/E0-C3-root-front.png",
+    boots: [
+      { file: "c-refined-20261116-derived/E0-C3-support.png", foot: 1, sole: { x: 205.5, y: 570 }, latched: true, role: "outgoing" },
+    ],
+    anchored: {
+      back: "c-refined-20261116-derived/E0-C3-root-back.png",
+      front: "c-refined-20261116-derived/E0-C3-root-front.png",
+    },
   },
   "source0-entry": {
     id: "source0-entry",
@@ -163,21 +177,36 @@ const POSES: Record<PlantPoseId, PlantPose> = {
   },
   "E1-C1": {
     id: "E1-C1",
-    trousers: "east-source1-entry-trousers.png",
-    boots: [],
-    composite: "c-refined-20261116/E1-C1-refined-static-transition.png",
+    trousers: "c-refined-20261116-derived/E1-C1-root-front.png",
+    boots: [
+      { file: "c-refined-20261116-derived/E1-C1-support.png", foot: 0, sole: { x: 204.5, y: 570 }, latched: true, role: "outgoing" },
+    ],
+    anchored: {
+      back: "c-refined-20261116-derived/E1-C1-root-back.png",
+      front: "c-refined-20261116-derived/E1-C1-root-front.png",
+    },
   },
   "E1-C2": {
     id: "E1-C2",
-    trousers: "east-source1-entry-trousers.png",
-    boots: [],
-    composite: "c-refined-20261116/E1-C2-refined-static-transition.png",
+    trousers: "c-refined-20261116-derived/E1-C2-root-front.png",
+    boots: [
+      { file: "c-refined-20261116-derived/E1-C2-support.png", foot: 0, sole: { x: 204.5, y: 570 }, latched: true, role: "outgoing" },
+    ],
+    anchored: {
+      back: "c-refined-20261116-derived/E1-C2-root-back.png",
+      front: "c-refined-20261116-derived/E1-C2-root-front.png",
+    },
   },
   "E1-C3": {
     id: "E1-C3",
-    trousers: "east-source1-entry-trousers.png",
-    boots: [],
-    composite: "c-refined-20261116/E1-C3-refined-static-transition.png",
+    trousers: "c-refined-20261116-derived/E1-C3-root-front.png",
+    boots: [
+      { file: "c-refined-20261116-derived/E1-C3-support.png", foot: 0, sole: { x: 204.5, y: 570 }, latched: true, role: "outgoing" },
+    ],
+    anchored: {
+      back: "c-refined-20261116-derived/E1-C3-root-back.png",
+      front: "c-refined-20261116-derived/E1-C3-root-front.png",
+    },
   },
   "source1-entry": {
     id: "source1-entry",

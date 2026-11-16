@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { NSW_MEASURED_STEP, WALK_CYCLE_DISTANCE } from "./motion";
 import { WALL_RAISE_SCALE } from "./walk-sheets";
@@ -110,9 +112,49 @@ test("approved C plates stay inside the existing entry interval", () => {
   assert.equal(poseFor(1, 0.01).id, "E1-C1");
   assert.equal(poseFor(1, 0.02).id, "E1-C2");
   assert.equal(poseFor(1, 0.042).id, "E1-C3");
-  assert.equal(poseFor(0, 0.05).composite, undefined);
-  assert.equal(poseFor(0, 0.01).composite, "c-refined-20261116/E0-C1-refined-static-transition.png");
+  assert.equal(poseFor(0, 0.05).anchored, undefined);
+  assert.equal(poseFor(0, 0.01).anchored?.front, "c-refined-20261116-derived/E0-C1-root-front.png");
   assert.equal(poseFor(0, 0.055).id, "E0-0.110");
+});
+
+test("a translated body keeps every C support sole on the outgoing latch", () => {
+  const locals = [0.01, 1 / 60, 0.02, 2 / 60, 0.0425, 0.0499];
+  for (const foot of [0, 1] as const) {
+    for (const local of locals) {
+      const pose = poseFor(foot, local);
+      assert.ok(pose.id.startsWith(foot === 0 ? "E0-C" : "E1-C"), pose.id);
+      assert.equal(pose.boots.length, 1);
+      const boot = pose.boots[0]!;
+      assert.equal(boot.latched, true);
+      assert.equal(boot.role, "outgoing");
+      assert.equal(boot.foot, foot === 0 ? 1 : 0);
+      const origin = { x: 2, y: 3 };
+      const root = { x: origin.x + local, y: origin.y };
+      const latch = latchWorld(origin, foot, "outgoing");
+      const placed = billboardBoot(root, latch, boot.sole, 400, 500, 1);
+      const unshifted = billboardBoot(root, null, boot.sole, 400, 500, 1);
+      assert.ok(Math.abs(placed.sole.x - placed.latch!.x) < 1e-9);
+      assert.ok(Math.abs(placed.sole.y - placed.latch!.y) < 1e-9);
+      assert.ok(Math.abs(placed.drawX - unshifted.drawX - -250 * local) < 1e-6);
+      assert.ok(Math.abs(placed.drawY - unshifted.drawY - -125 * local) < 1e-6);
+      assert.equal(pose.anchored?.back.includes("root-back"), true);
+      assert.notEqual(pose.anchored?.front, boot.file);
+    }
+  }
+  const entry = poseFor(0, 0.05);
+  assert.equal(entry.id, "source0-entry");
+  assert.equal(entry.boots.filter((boot) => boot.latched).length, 2);
+  const mid = poseFor(0, 0.22);
+  assert.equal(mid.boots.find((boot) => boot.role === "swing")?.latched, false);
+  assert.equal(mid.boots.find((boot) => boot.role === "support")?.latched, true);
+});
+
+test("derived C layers regenerate from the approved plates", () => {
+  const ran = spawnSync(process.execPath, ["scripts/derive-c-support.mjs", "--check"], {
+    cwd: fileURLToPath(new URL("../..", import.meta.url)),
+    encoding: "utf8",
+  });
+  assert.equal(ran.status, 0, ran.stderr || ran.stdout);
 });
 
 test("east mid-hold is the half of the 0.440 plant, not the 0.256 window", () => {

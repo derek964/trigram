@@ -543,12 +543,24 @@ export class WalkMode {
       "trousers-E1-0.385.png",
       "trousers-E0-0.4125.png",
       "trousers-E1-0.4125.png",
-      "c-refined-20261116/E0-C1-refined-static-transition.png",
-      "c-refined-20261116/E0-C2-refined-static-transition.png",
-      "c-refined-20261116/E0-C3-refined-static-transition.png",
-      "c-refined-20261116/E1-C1-refined-static-transition.png",
-      "c-refined-20261116/E1-C2-refined-static-transition.png",
-      "c-refined-20261116/E1-C3-refined-static-transition.png",
+      "c-refined-20261116-derived/E0-C1-support.png",
+      "c-refined-20261116-derived/E0-C1-root-back.png",
+      "c-refined-20261116-derived/E0-C1-root-front.png",
+      "c-refined-20261116-derived/E0-C2-support.png",
+      "c-refined-20261116-derived/E0-C2-root-back.png",
+      "c-refined-20261116-derived/E0-C2-root-front.png",
+      "c-refined-20261116-derived/E0-C3-support.png",
+      "c-refined-20261116-derived/E0-C3-root-back.png",
+      "c-refined-20261116-derived/E0-C3-root-front.png",
+      "c-refined-20261116-derived/E1-C1-support.png",
+      "c-refined-20261116-derived/E1-C1-root-back.png",
+      "c-refined-20261116-derived/E1-C1-root-front.png",
+      "c-refined-20261116-derived/E1-C2-support.png",
+      "c-refined-20261116-derived/E1-C2-root-back.png",
+      "c-refined-20261116-derived/E1-C2-root-front.png",
+      "c-refined-20261116-derived/E1-C3-support.png",
+      "c-refined-20261116-derived/E1-C3-root-back.png",
+      "c-refined-20261116-derived/E1-C3-root-front.png",
     ];
     await Promise.all(
       plateNames.map(async (name) => {
@@ -1303,9 +1315,9 @@ export class WalkMode {
       !!this.eastPlates["trousers-E0-0.330.png"] &&
       !!this.eastPlates["trousers-E0-0.385.png"] &&
       !!this.eastPlates["trousers-E0-0.4125.png"] &&
-      !!this.eastPlates["c-refined-20261116/E0-C1-refined-static-transition.png"] &&
-      !!this.eastPlates["c-refined-20261116/E1-C3-refined-static-transition.png"] &&
-      Object.keys(this.eastPlates).length >= 48
+      !!this.eastPlates["c-refined-20261116-derived/E0-C1-support.png"] &&
+      !!this.eastPlates["c-refined-20261116-derived/E1-C3-root-front.png"] &&
+      Object.keys(this.eastPlates).length >= 60
     );
   }
 
@@ -1314,23 +1326,6 @@ export class WalkMode {
     const plant = this.eastPlant;
     if (!plant) return;
     const pose = poseFor(plant.foot, plant.local);
-    if (pose.composite) {
-      const plate = this.eastPlates[pose.composite];
-      if (!plate) return;
-      this.ctx.drawImage(
-        plate,
-        feetX - WALK_ANCHOR_X * px,
-        feetY - WALK_ANCHOR_Y * px,
-        WALK_FRAME_W * px,
-        WALK_FRAME_H * px,
-      );
-      if (this.evidenceWanted) this.evidenceEastDrawn = { poseId: pose.id, boots: [] };
-      return;
-    }
-    const shaft = this.eastPlates["shared-rear-shaft.png"];
-    const upper = this.eastPlates["shared-fixed-upper.png"];
-    const trousers = this.eastPlates[pose.trousers];
-    if (!shaft || !upper || !trousers) return;
     const atRoot = (img: Img) => {
       this.ctx.drawImage(
         img,
@@ -1340,6 +1335,42 @@ export class WalkMode {
         WALK_FRAME_H * px,
       );
     };
+    if (pose.anchored) {
+      const back = this.eastPlates[pose.anchored.back];
+      const front = this.eastPlates[pose.anchored.front];
+      if (!back || !front) return;
+      atRoot(back);
+      const origin = { x: plant.originX, y: plant.originY };
+      const recorded: EvidenceBoot[] | null = this.evidenceWanted ? [] : null;
+      for (const boot of pose.boots) {
+        const img = this.eastPlates[boot.file];
+        if (!img) return;
+        const screen = this.bootScreen(boot, origin, feetX, feetY, px);
+        this.ctx.drawImage(img, screen.drawX, screen.drawY, WALK_FRAME_W * px, WALK_FRAME_H * px);
+        this.noteSole(pose.id, boot, screen, px);
+        if (recorded) {
+          const delta = screen.latch ? Math.hypot(screen.sole.x - screen.latch.x, screen.sole.y - screen.latch.y) : null;
+          const rootDelta = screen.latch ? Math.hypot(screen.rootSole.x - screen.latch.x, screen.rootSole.y - screen.latch.y) : null;
+          recorded.push({
+            role: boot.role,
+            foot: boot.foot,
+            latched: boot.latched,
+            soleArt: { x: boot.sole.x, y: boot.sole.y },
+            latchWorld: screen.latchWorld ? { x: screen.latchWorld.x, y: screen.latchWorld.y } : null,
+            projectedSole: { x: screen.sole.x, y: screen.sole.y },
+            projectedDeltaPx: delta,
+            projectedArtDelta: rootDelta != null && px ? rootDelta / px : null,
+          });
+        }
+      }
+      atRoot(front);
+      if (recorded) this.evidenceEastDrawn = { poseId: pose.id, boots: recorded };
+      return;
+    }
+    const shaft = this.eastPlates["shared-rear-shaft.png"];
+    const upper = this.eastPlates["shared-fixed-upper.png"];
+    const trousers = this.eastPlates[pose.trousers];
+    if (!shaft || !upper || !trousers) return;
     atRoot(shaft);
     const origin = { x: plant.originX, y: plant.originY };
     const recorded: EvidenceBoot[] | null = this.evidenceWanted ? [] : null;
