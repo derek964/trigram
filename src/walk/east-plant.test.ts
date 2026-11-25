@@ -4,12 +4,14 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { NSW_MEASURED_STEP, WALK_CYCLE_DISTANCE } from "./motion";
+import { MOVE_SPEED, NSW_MEASURED_STEP, WALK_CYCLE_DISTANCE } from "./motion";
 import { WALL_RAISE_SCALE } from "./walk-sheets";
 import {
   ENTRY_SOLE_Y_GAP,
   PLANT_ART_DELTA_X,
   PLANT_ART_DELTA_Y,
+  EAST_110_END,
+  EAST_ENTRY_END,
   PLANT_CYCLE,
   PLANT_DISTANCE,
   artToWorld,
@@ -114,7 +116,27 @@ test("approved C plates stay inside the existing entry interval", () => {
   assert.equal(poseFor(1, 0.042).id, "E1-C3");
   assert.equal(poseFor(0, 0.05).anchored, undefined);
   assert.equal(poseFor(0, 0.01).anchored?.front, "c-refined-20261116-derived/E0-C1-root-front.png");
-  assert.equal(poseFor(0, 0.055).id, "E0-0.110");
+  assert.equal(poseFor(0, 0.055).id, "source0-entry");
+});
+
+test("early C3 plus one 60 Hz step lands in entry", () => {
+  const step = MOVE_SPEED / 60;
+  const earlyC3 = 2 / 60;
+  const landing = earlyC3 + step;
+  assert.equal(MOVE_SPEED, 2.55);
+  assert.equal(PLANT_DISTANCE, 0.44);
+  assert.equal(EAST_ENTRY_END, landing);
+  assert.equal(EAST_110_END, 0.165);
+  assert.equal(poseFor(0, earlyC3).id, "E0-C3");
+  assert.equal(poseFor(1, earlyC3).id, "E1-C3");
+  assert.equal(poseFor(0, landing).id, "source0-entry");
+  assert.equal(poseFor(1, landing).id, "source1-entry");
+  assert.equal(poseFor(0, landing + 1e-9).id, "E0-0.110");
+  assert.equal(poseFor(1, landing + 1e-9).id, "E1-0.110");
+  assert.equal(poseFor(0, 0.0499 + step).id, "E0-0.110");
+  assert.equal(poseFor(0, 0.11).id, "E0-0.110");
+  assert.equal(poseFor(0, 0.164999).id, "E0-0.110");
+  assert.equal(poseFor(0, 0.165).id, "E0-mid");
 });
 
 test("a translated body keeps every C support sole on the outgoing latch", () => {

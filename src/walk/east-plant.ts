@@ -5,6 +5,8 @@
  * and upper stay on the root. This is not a gait pass.
  */
 
+import { MOVE_SPEED } from "./motion";
+
 export const PLANT_PIVOT_X = 256;
 export const PLANT_PIVOT_Y = 600;
 /** Entry contact to trailing support, art pixels. Image y grows downward. */
@@ -48,8 +50,14 @@ export type PlantPoseId =
   | "E1-0.385"
   | "E1-0.4125"
   | "source1-trailing";
-/** Windows of one 0.440 plant. Not the 1.024 cycle and not the 0.256 plants. */
-export const EAST_ENTRY_END = 0.055;
+/**
+ * Windows of one 0.440 plant. Not the 1.024 cycle and not the 0.256 plants.
+ * Entry includes one 60 Hz step past early C3. Early C3 is 2/60.
+ * One step is MOVE_SPEED/60. That sum is inside entry because the test is
+ * `local <= EAST_ENTRY_END`. The 0.110 pose begins on the next local and
+ * still ends at 0.165. A rounded 0.0758 would leave the exact sum in 0.110.
+ */
+export const EAST_ENTRY_END = 2 / 60 + MOVE_SPEED / 60;
 export const EAST_110_END = 0.165;
 export const EAST_220_END = 0.275;
 export const EAST_330_END = 0.385;
@@ -311,11 +319,9 @@ export function billboardBoot(
 }
 
 /**
- * C plates sit inside the existing entry interval. EAST_ENTRY_END stays 0.055.
- * local 0 and [0.05, 0.055) stay the original entry, so the old boundary tests
- * still name that plate. (0, 1/60) is C1, [1/60, 2/60) is C2, [2/60, 0.05) is C3.
- * A full east step is about 0.042, which selects C3. Smaller remainders select
- * C1 or C2. These cuts are not new travel windows.
+ * C plates stay in front of the original entry plates.
+ * local 0 and [0.05, EAST_ENTRY_END] are the original entry.
+ * (0, 1/60) is C1, [1/60, 2/60) is C2, and [2/60, 0.05) is C3.
  */
 function refinedEntryId(foot: PlantFoot, local: number): PlantPoseId {
   const original = foot === 0 ? "source0-entry" : "source1-entry";
@@ -326,7 +332,7 @@ function refinedEntryId(foot: PlantFoot, local: number): PlantPoseId {
 
 export function poseFor(foot: PlantFoot, local: number): PlantPose {
   const id = foot === 0
-    ? local < EAST_ENTRY_END
+    ? local <= EAST_ENTRY_END
       ? refinedEntryId(0, local)
       : local < EAST_110_END
         ? "E0-0.110"
@@ -339,7 +345,7 @@ export function poseFor(foot: PlantFoot, local: number): PlantPose {
               : local < EAST_4125_END
                 ? "E0-0.4125"
                 : "source0-trailing"
-    : local < EAST_ENTRY_END
+    : local <= EAST_ENTRY_END
       ? refinedEntryId(1, local)
       : local < EAST_110_END
         ? "E1-0.110"
