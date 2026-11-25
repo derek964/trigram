@@ -37,6 +37,7 @@ import {
 import { clamp, dist, lerp, type Vec2 } from "./math";
 import { loadProgress, markCleared, saveProgress, type Progress } from "./progress";
 import { emitClear, emitDeath } from "./ads";
+import { onLevelClear, pacing, savePacing } from "./ad-pacing";
 import { showInterstitial, showRewardedVideo, type RewardedScene } from "./ad-service";
 import {
   countdownUrgent,
@@ -1165,7 +1166,9 @@ export class Game {
     qs("#peek-badge").classList.add("hidden");
     qs("#tip-banner").classList.add("hidden");
     this.setRunChrome(false);
-    const interstitial = emitClear(this.levelId);
+    const paced = !this.shotMode && onLevelClear(pacing(), this.levelId, Date.now());
+    savePacing();
+    const interstitial = paced ? emitClear(this.levelId) : null;
     if (!this.shotMode) {
       track("level_clear", { level: this.levelId, stars, steps: this.steps });
       if (interstitial) {

@@ -6,8 +6,8 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#7dccb3" />
-    <title>拯救小动物</title>
+    <meta name="theme-color" content="#e6d5bf" />
+    <title>纸艺迷宫</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -15,7 +15,7 @@
       rel="stylesheet"
     />
   </head>
-  <body>
+  <body class="walk-mode">
     <div id="app">
       <header class="hud hidden" id="hud">
         <div class="hud-top">
@@ -39,7 +39,7 @@
 
       <main class="stage">
         <canvas id="game" width="720" height="1280"></canvas>
-        <div class="stick-hint" id="stick-hint">点相邻格子走一步 · 拖动手势或 WASD</div>
+        <div class="stick-hint hidden" id="stick-hint">按住方向键或 WASD，沿走廊走到绿旗</div>
         <div id="finger-cue" class="finger-cue hidden" aria-hidden="true">
           <div class="finger-ripple"></div>
           <svg class="finger-hand" viewBox="0 0 64 88" aria-hidden="true">
@@ -77,17 +77,17 @@
         <button type="button" class="ghost dock-btn" id="btn-undo" aria-label="撤销上一步">撤销</button>
       </footer>
 
-      <section class="overlay" id="title-screen">
+      <section class="overlay hidden" id="title-screen">
         <div class="panel">
           <div id="title-art" class="title-art" aria-hidden="true"></div>
-          <p class="kicker">夜班志愿者</p>
-          <h1>拯救小动物</h1>
+          <p class="kicker">连续行走</p>
+          <h1>纸艺迷宫</h1>
           <p class="lead">
-            在收容所平面图上走夜班：从南门进楼，把隔离间里的小动物带到出口。绕晕了就点「检修」再点墙。
+            按住方向在纸墙迷宫里走。撞上墙会停下，并顺着墙滑开。走到绿旗即可。
           </p>
-          <button type="button" class="primary" id="btn-start">开始救援</button>
-          <button type="button" class="ghost hidden" id="btn-continue">继续救援</button>
-          <p class="fine">点相邻格子走一步 · 拖动手势或 WASD · 夜巡 / 钥匙串 / 防盗夜 · 三十关</p>
+          <button type="button" class="primary" id="btn-start">走进迷宫</button>
+          <button type="button" class="ghost hidden" id="btn-continue" aria-hidden="true">继续救援</button>
+          <p class="fine">一部迷宫 · 一个角色 · 重开</p>
           <div class="legal-links">
             <button type="button" class="tiny" id="btn-privacy">隐私政策</button>
             <button type="button" class="tiny" id="btn-terms">用户协议</button>

@@ -1,0 +1,236 @@
+{
+  "method": "Flood the planted leg on the approved plate below y=436, outside the shared upper and the rear shaft. Copy those pixels into the support layer. Copy shaft-like pixels to root-back and the rest to root-front. Extend the support 14px up-left under fully opaque front pixels so the cloak tuck survives the latch shift. The extension stays hidden when the shift is zero.",
+  "thresholds": {
+    "preserveY": 436,
+    "emptyAlpha": 8,
+    "upperAlpha": 16,
+    "shaftAlpha": 200,
+    "shaftDistance": 12,
+    "seamRadius": 14,
+    "seamFringe": 2
+  },
+  "plates": [
+    {
+      "id": "E0-C1",
+      "source": "c-refined-20261116/E0-C1-refined-static-transition.png",
+      "sourceSha256": "33d74c07f7229dd1e1233745268116212a242bb2ce36d2e73ec88ad577223591",
+      "foot": 1,
+      "role": "outgoing",
+      "sole": {
+        "x": 205.5,
+        "y": 570
+      },
+      "seed": {
+        "x": 206,
+        "y": 569
+      },
+      "bbox": [
+        170,
+        490,
+        259,
+        569
+      ],
+      "supportPixels": 3509,
+      "seamPixels": 768,
+      "outputs": {
+        "support": {
+          "file": "E0-C1-support.png",
+          "sha256": "19f13f1625e99ffc2bf717938c2d402ca692490dc4dbe930b6711602a7b441ef"
+        },
+        "rootBack": {
+          "file": "E0-C1-root-back.png",
+          "sha256": "cc40f726fae48e22089ada4036a043e65a4270186fc9959ae2a85eb723173a1a"
+        },
+        "rootFront": {
+          "file": "E0-C1-root-front.png",
+          "sha256": "9f5de3b2098fd4db2935fb90aca002b21fe00095c082fc0e50e6794327927c69"
+        }
+      }
+    },
+    {
+      "id": "E0-C2",
+      "source": "c-refined-20261116/E0-C2-refined-static-transition.png",
+      "sourceSha256": "37d30d235684c4672b4db95b6bc4f2bb6ba686c64a695a5474121e4ec3070c9a",
+      "foot": 1,
+      "role": "outgoing",
+      "sole": {
+        "x": 205.5,
+        "y": 570
+      },
+      "seed": {
+        "x": 206,
+        "y": 569
+      },
+      "bbox": [
+        170,
+        490,
+        259,
+        569
+      ],
+      "supportPixels": 3509,
+      "seamPixels": 768,
+      "outputs": {
+        "support": {
+          "file": "E0-C2-support.png",
+          "sha256": "19f13f1625e99ffc2bf717938c2d402ca692490dc4dbe930b6711602a7b441ef"
+        },
+        "rootBack": {
+          "file": "E0-C2-root-back.png",
+          "sha256": "c0edf50e9d7a1e27a429d3b98f4a1fca12d3b0805b740dba9011609dcc3a8648"
+        },
+        "rootFront": {
+          "file": "E0-C2-root-front.png",
+          "sha256": "d021007064567dc0c3c07b6a0b39efd914898678017af96fb8ccb46e096c93a6"
+        }
+      }
+    },
+    {
+      "id": "E0-C3",
+      "source": "c-refined-20261116/E0-C3-refined-static-transition.png",
+      "sourceSha256": "6a8cc08aa7c7c2c7853047abe9f9a234f6b66fc2367f5ca459f4225e94831843",
+      "foot": 1,
+      "role": "outgoing",
+      "sole": {
+        "x": 205.5,
+        "y": 570
+      },
+      "seed": {
+        "x": 206,
+        "y": 569
+      },
+      "bbox": [
+        170,
+        490,
+        259,
+        569
+      ],
+      "supportPixels": 3509,
+      "seamPixels": 768,
+      "outputs": {
+        "support": {
+          "file": "E0-C3-support.png",
+          "sha256": "19f13f1625e99ffc2bf717938c2d402ca692490dc4dbe930b6711602a7b441ef"
+        },
+        "rootBack": {
+          "file": "E0-C3-root-back.png",
+          "sha256": "0ac3bc8fecc7a024673ce8a191c8d550da92681ac1ea86a328204c6902b48f4d"
+        },
+        "rootFront": {
+          "file": "E0-C3-root-front.png",
+          "sha256": "de83f42d5da8f19b3f825cd3380f662036dd2763d21a34ccccb92172eaeb5436"
+        }
+      }
+    },
+    {
+      "id": "E1-C1",
+      "source": "c-refined-20261116/E1-C1-refined-static-transition.png",
+      "sourceSha256": "b4646919d5f1b19374f654e235f7d41020b2ce0a446ffb722639e19438788ca0",
+      "foot": 0,
+      "role": "outgoing",
+      "sole": {
+        "x": 204.5,
+        "y": 570
+      },
+      "seed": {
+        "x": 205,
+        "y": 570
+      },
+      "bbox": [
+        154,
+        493,
+        230,
+        570
+      ],
+      "supportPixels": 3608,
+      "seamPixels": 549,
+      "outputs": {
+        "support": {
+          "file": "E1-C1-support.png",
+          "sha256": "6e9282319790059e1423a8882bc9b207965646dc32149d367ae22eb4249ef272"
+        },
+        "rootBack": {
+          "file": "E1-C1-root-back.png",
+          "sha256": "8bf7a5a7ee777ac7a44d6454e741d1b874a1d06813fdaf5288a6cf10e536b593"
+        },
+        "rootFront": {
+          "file": "E1-C1-root-front.png",
+          "sha256": "e6182aa9763a051afb8e7c3611bfe176a61a9ed01b028027dc0871df4b46f2f9"
+        }
+      }
+    },
+    {
+      "id": "E1-C2",
+      "source": "c-refined-20261116/E1-C2-refined-static-transition.png",
+      "sourceSha256": "e0c1785b11af5e4e06c351fb5937a1a42370b6925c38dd1d04625aff4f69bfbb",
+      "foot": 0,
+      "role": "outgoing",
+      "sole": {
+        "x": 204.5,
+        "y": 570
+      },
+      "seed": {
+        "x": 205,
+        "y": 570
+      },
+      "bbox": [
+        154,
+        493,
+        230,
+        570
+      ],
+      "supportPixels": 3608,
+      "seamPixels": 549,
+      "outputs": {
+        "support": {
+          "file": "E1-C2-support.png",
+          "sha256": "6e9282319790059e1423a8882bc9b207965646dc32149d367ae22eb4249ef272"
+        },
+        "rootBack": {
+          "file": "E1-C2-root-back.png",
+          "sha256": "07dadbfeecab7c49da399ab8780693a07007f88a34a7b2ab930d97b681196aac"
+        },
+        "rootFront": {
+          "file": "E1-C2-root-front.png",
+          "sha256": "f4c3de481e7a72449550a055047fc0cd5137c70dd833128c7e7404c19472c1c2"
+        }
+      }
+    },
+    {
+      "id": "E1-C3",
+      "source": "c-refined-20261116/E1-C3-refined-static-transition.png",
+      "sourceSha256": "db5e343872917767a4bf8beb2524b3a8f9535217fb81e8b42e2eadfafa268f26",
+      "foot": 0,
+      "role": "outgoing",
+      "sole": {
+        "x": 204.5,
+        "y": 570
+      },
+      "seed": {
+        "x": 205,
+        "y": 570
+      },
+      "bbox": [
+        154,
+        493,
+        230,
+        570
+      ],
+      "supportPixels": 3608,
+      "seamPixels": 549,
+      "outputs": {
+        "support": {
+          "file": "E1-C3-support.png",
+          "sha256": "6e9282319790059e1423a8882bc9b207965646dc32149d367ae22eb4249ef272"
+        },
+        "rootBack": {
+          "file": "E1-C3-root-back.png",
+          "sha256": "fcb697f052aaca97715a5966954b6a3d75488fb4f6edf148d2e422e4637197bf"
+        },
+        "rootFront": {
+          "file": "E1-C3-root-front.png",
+          "sha256": "f30b6fef40a404efd5f4f26c83b648eda498eadec322c6ad3c481030d38d218e"
+        }
+      }
+    }
+  ]
+}
