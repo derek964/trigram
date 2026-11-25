@@ -5,8 +5,6 @@
  * and upper stay on the root. This is not a gait pass.
  */
 
-import { MOVE_SPEED } from "./motion";
-
 export const PLANT_PIVOT_X = 256;
 export const PLANT_PIVOT_Y = 600;
 /** Entry contact to trailing support, art pixels. Image y grows downward. */
@@ -52,12 +50,13 @@ export type PlantPoseId =
   | "source1-trailing";
 /**
  * Windows of one 0.440 plant. Not the 1.024 cycle and not the 0.256 plants.
- * Entry includes one 60 Hz step past early C3. Early C3 is 2/60.
- * One step is MOVE_SPEED/60. That sum is inside entry because the test is
+ * Early C3 is 2/60. EAST_OBSERVED_STEP is the moving step seen on 606cf94.
+ * It is not MOVE_SPEED/60. Entry includes that sum because the test is
  * `local <= EAST_ENTRY_END`. The 0.110 pose begins on the next local and
- * still ends at 0.165. A rounded 0.0758 would leave the exact sum in 0.110.
+ * still ends at 0.165. A rounded 0.076173 would leave the exact sum in 0.110.
  */
-export const EAST_ENTRY_END = 2 / 60 + MOVE_SPEED / 60;
+export const EAST_OBSERVED_STEP = 0.042840;
+export const EAST_ENTRY_END = 2 / 60 + EAST_OBSERVED_STEP;
 export const EAST_110_END = 0.165;
 export const EAST_220_END = 0.275;
 export const EAST_330_END = 0.385;

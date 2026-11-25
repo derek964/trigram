@@ -12,6 +12,7 @@ import {
   PLANT_ART_DELTA_Y,
   EAST_110_END,
   EAST_ENTRY_END,
+  EAST_OBSERVED_STEP,
   PLANT_CYCLE,
   PLANT_DISTANCE,
   artToWorld,
@@ -119,12 +120,13 @@ test("approved C plates stay inside the existing entry interval", () => {
   assert.equal(poseFor(0, 0.055).id, "source0-entry");
 });
 
-test("early C3 plus one 60 Hz step lands in entry", () => {
-  const step = MOVE_SPEED / 60;
+test("early C3 plus the observed 0.042840 step lands in entry", () => {
   const earlyC3 = 2 / 60;
-  const landing = earlyC3 + step;
+  const landing = earlyC3 + EAST_OBSERVED_STEP;
   assert.equal(MOVE_SPEED, 2.55);
   assert.equal(PLANT_DISTANCE, 0.44);
+  assert.equal(WALK_CYCLE_DISTANCE, 1.024);
+  assert.equal(EAST_OBSERVED_STEP, 0.042840);
   assert.equal(EAST_ENTRY_END, landing);
   assert.equal(EAST_110_END, 0.165);
   assert.equal(poseFor(0, earlyC3).id, "E0-C3");
@@ -133,7 +135,10 @@ test("early C3 plus one 60 Hz step lands in entry", () => {
   assert.equal(poseFor(1, landing).id, "source1-entry");
   assert.equal(poseFor(0, landing + 1e-9).id, "E0-0.110");
   assert.equal(poseFor(1, landing + 1e-9).id, "E1-0.110");
-  assert.equal(poseFor(0, 0.0499 + step).id, "E0-0.110");
+  assert.equal(poseFor(0, earlyC3 + MOVE_SPEED / 60).id, "source0-entry");
+  assert.equal(poseFor(0, earlyC3 + 0.042585).id, "source0-entry");
+  assert.equal(poseFor(0, 0.0499 + MOVE_SPEED / 60).id, "E0-0.110");
+  assert.equal(poseFor(1, 0.0499 + 0.042840).id, "E1-0.110");
   assert.equal(poseFor(0, 0.11).id, "E0-0.110");
   assert.equal(poseFor(0, 0.164999).id, "E0-0.110");
   assert.equal(poseFor(0, 0.165).id, "E0-mid");
